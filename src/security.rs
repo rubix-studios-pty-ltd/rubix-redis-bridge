@@ -279,11 +279,11 @@ mod tests {
     fn denies_script_management_even_when_allowed() {
         let mut policy = policy();
         policy.allowed_commands.insert("SCRIPT".to_string());
-    
+
         let err = policy
             .parse_single_command(&serde_json::json!(["SCRIPT", "LOAD", "return 1"]))
             .unwrap_err();
-    
+
         assert!(err.to_string().contains("hard-denied"));
     }
 
@@ -355,9 +355,9 @@ mod tests {
     fn validate_rejects_hard_denied_allowed_commands() {
         let mut policy = policy();
         policy.allowed_commands.insert("FCALL".to_string());
-    
+
         let err = policy.validate().unwrap_err();
-    
+
         assert!(err.to_string().contains("hard-denied"));
     }
 }
