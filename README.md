@@ -423,7 +423,7 @@ $env:RRB_TOKEN = "replace-with-bridge-token"
 pnpm test:sdk
 ```
 
-## Recommended production posture
+## Recommended
 
 Use Rubix Redis Bridge as a private infrastructure service first.
 
