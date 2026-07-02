@@ -1,10 +1,60 @@
 {
+  "name": "rubix-redis-bridge",
+  "title": "Rubix Redis Bridge",
+  "version": "0.1.0",
+  "description": "Secure Rust HTTP bridge for Redis with Upstash-style API compatibility, command allowlisting, hard-denied dangerous Redis commands, Docker deployment, and SDK compatibility tests.",
+  "license": "MIT",
   "private": true,
   "type": "module",
+  "author": "Rubix Studios <hello@rubixstudios.com.au> (https://rubixstudios.com.au)",
+  "homepage": "https://rubixstudios.com.au",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/issues"
+  },
+  "maintainers": [
+    {
+      "name": "Rubix Studios",
+      "email": "hello@rubixstudios.com.au",
+      "url": "https://rubixstudios.com.au"
+    }
+  ],
+  "keywords": [
+    "redis",
+    "rust",
+    "http",
+    "redis-client",
+    "redis-proxy",
+    "upstash",
+    "upstash-redis",
+    "docker",
+    "docker-image",
+    "axum",
+    "tokio",
+    "api-bridge",
+    "secure-by-default",
+    "self-hosted",
+    "infrastructure",
+    "devops"
+  ],
   "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "clean": "pnpm biome migrate --write && pnpm run lint:fix && pnpm run format",
+    "format": "biome format --write .",
+    "tauri:update": "cargo update && cargo upgrade && cargo fmt",
+    "update": "pnpm self-update && pnpm update --latest --recursive && pnpm install && pnpm prune && pnpm dedupe && pnpm run clean && pnpm run tauri:update",
     "test:rust": "cargo test",
     "test:sdk": "node --test tests/sdk/upstash.test.mjs",
     "test:all": "cargo test && node --test tests/sdk/upstash.test.mjs"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": "24.x || 25.x",
+    "pnpm": ">=10"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
