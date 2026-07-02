@@ -14,7 +14,27 @@ const redis = new Redis({
   token,
 })
 
-test('Single commands work through @upstash/redis', async () => {
+async function rawCommand(command) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(command),
+  })
+
+  const body = await response.json().catch(() => null)
+
+  return {
+    status: response.status,
+    body,
+    result: body?.result,
+    error: body?.error,
+  }
+}
+
+test('Single string commands work through @upstash/redis', async () => {
   await redis.del('sdk:hello')
 
   const setResult = await redis.set('sdk:hello', 'world')
@@ -23,47 +43,140 @@ test('Single commands work through @upstash/redis', async () => {
   const value = await redis.get('sdk:hello')
   assert.equal(value, 'world')
 
+  const exists = await redis.exists('sdk:hello')
+  assert.equal(exists, 1)
+
+  const deleted = await redis.del('sdk:hello')
+  assert.equal(deleted, 1)
+
+  const missing = await redis.get('sdk:hello')
+  assert.equal(missing, null)
+})
+
+test('PING works through @upstash/redis', async () => {
   const ping = await redis.ping()
+
   assert.equal(ping, 'PONG')
 })
 
+test('Numeric commands work through @upstash/redis', async () => {
+  await redis.del('sdk:number')
+
+  const setResult = await redis.set('sdk:number', '1')
+  assert.equal(setResult, 'OK')
+
+  const incremented = await redis.incr('sdk:number')
+  assert.equal(incremented, 2)
+
+  const decremented = await redis.decr('sdk:number')
+  assert.equal(decremented, 1)
+})
+
+test('TTL and EXPIRE commands work through @upstash/redis', async () => {
+  await redis.del('sdk:ttl')
+
+  const setResult = await redis.set('sdk:ttl', '1', { ex: 60 })
+  assert.equal(setResult, 'OK')
+
+  const ttl = await redis.ttl('sdk:ttl')
+  assert.ok(ttl > 0)
+  assert.ok(ttl <= 60)
+
+  const expireResult = await redis.expire('sdk:ttl', 120)
+  assert.equal(expireResult, 1)
+
+  const updatedTtl = await redis.ttl('sdk:ttl')
+  assert.ok(updatedTtl > 60)
+  assert.ok(updatedTtl <= 120)
+})
+
+test('Missing keys return null through @upstash/redis', async () => {
+  await redis.del('sdk:missing')
+  await redis.del('sdk:missing-hash')
+
+  assert.equal(await redis.get('sdk:missing'), null)
+  assert.equal(await redis.hget('sdk:missing-hash', 'field'), null)
+})
+
+test('Hash commands work through @upstash/redis', async () => {
+  await redis.del('sdk:h')
+
+  const hsetResult = await redis.hset('sdk:h', {
+    a: 'one',
+    b: 'two',
+  })
+
+  assert.equal(hsetResult, 2)
+
+  const hgetResult = await redis.hget('sdk:h', 'a')
+  assert.equal(hgetResult, 'one')
+
+  const hgetallResult = await redis.hgetall('sdk:h')
+  assert.deepEqual(hgetallResult, {
+    a: 'one',
+    b: 'two',
+  })
+
+  const hdelResult = await redis.hdel('sdk:h', 'a')
+  assert.equal(hdelResult, 1)
+
+  const deletedField = await redis.hget('sdk:h', 'a')
+  assert.equal(deletedField, null)
+
+  const remaining = await redis.hgetall('sdk:h')
+  assert.deepEqual(remaining, {
+    b: 'two',
+  })
+})
+
+test('HMGET works through raw Upstash-style command shape', async () => {
+  await redis.del('sdk:hmget')
+
+  const hsetResult = await redis.hset('sdk:hmget', {
+    a: 'one',
+    b: 'two',
+  })
+
+  assert.equal(hsetResult, 2)
+
+  const result = await rawCommand(['HMGET', 'sdk:hmget', 'a', 'b', 'missing'])
+
+  assert.equal(result.status, 200)
+  assert.deepEqual(result.result, ['one', 'two', null])
+})
+
 test('Pipeline works through @upstash/redis', async () => {
-  await redis.del('sdk:p1')
+  await redis.del('sdk:pipeline')
 
   const pipeline = redis.pipeline()
-  pipeline.set('sdk:p1', 'v1')
-  pipeline.get('sdk:p1')
+
+  pipeline.set('sdk:pipeline', 'v1')
+  pipeline.get('sdk:pipeline')
+  pipeline.exists('sdk:pipeline')
+  pipeline.incr('sdk:pipeline-counter')
+  pipeline.decr('sdk:pipeline-counter')
 
   const result = await pipeline.exec()
 
-  assert.deepEqual(result, ['OK', 'v1'])
-})
-
-test('Multi exec works through @upstash/redis', async () => {
-  await redis.del('sdk:counter')
-
-  const tx = redis.multi()
-  tx.set('sdk:counter', '1')
-  tx.incr('sdk:counter')
-
-  const result = await tx.exec()
-
-  assert.deepEqual(result, ['OK', 2])
+  assert.deepEqual(result, ['OK', 'v1', 1, 1, 0])
 })
 
 test('Pipeline keeps per-command Redis errors when keepErrors is true', async () => {
   await redis.del('sdk:num')
 
   const pipeline = redis.pipeline()
+
   pipeline.set('sdk:num', 'not-a-number')
   pipeline.incr('sdk:num')
+  pipeline.get('sdk:num')
 
   const result = await pipeline.exec({ keepErrors: true })
 
-  assert.equal(result.length, 2)
+  assert.equal(result.length, 3)
 
   const first = result[0]
   const second = result[1]
+  const third = result[2]
 
   assert.equal(first.result, 'OK')
   assert.equal(first.error, undefined)
@@ -73,40 +186,62 @@ test('Pipeline keeps per-command Redis errors when keepErrors is true', async ()
     second.error,
     `Expected second pipeline item to contain an error, got: ${JSON.stringify(second)}`
   )
-
   assert.match(String(second.error), /integer|number|ERR|value/i)
+
+  assert.equal(third.result, 'not-a-number')
+  assert.equal(third.error, undefined)
 })
 
-test('Null and numeric responses match @upstash/redis expectations', async () => {
-  await redis.del('sdk:missing')
-  assert.equal(await redis.get('sdk:missing'), null)
+test('Multi exec works through @upstash/redis', async () => {
+  await redis.del('sdk:counter')
 
-  await redis.set('sdk:n', '1')
-  assert.equal(await redis.incr('sdk:n'), 2)
+  const tx = redis.multi()
+
+  tx.set('sdk:counter', '1')
+  tx.incr('sdk:counter')
+  tx.decr('sdk:counter')
+  tx.get('sdk:counter')
+
+  const result = await tx.exec()
+
+  assert.deepEqual(result, ['OK', 2, 1, 1])
 })
 
-test('Missing key returns null', async () => {
-  await redis.del('sdk:missing')
-  assert.equal(await redis.get('sdk:missing'), null)
+test('Raw command endpoint matches Upstash-style JSON response', async () => {
+  await redis.del('sdk:raw')
+
+  const setResult = await rawCommand(['SET', 'sdk:raw', 'ok'])
+  assert.equal(setResult.status, 200)
+  assert.equal(setResult.result, 'OK')
+
+  const getResult = await rawCommand(['GET', 'sdk:raw'])
+  assert.equal(getResult.status, 200)
+  assert.equal(getResult.result, 'ok')
 })
 
-test('Numeric responses match SDK expectations', async () => {
-  await redis.set('sdk:n', '1')
-  assert.equal(await redis.incr('sdk:n'), 2)
+test('Unauthorized requests are rejected', async () => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer wrong-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(['PING']),
+  })
+
+  assert.equal(response.status, 401)
 })
 
-test('Hash commands work', async () => {
-  await redis.del('sdk:h')
+test('Dangerous commands are rejected before Redis execution', async () => {
+  const result = await rawCommand(['EVAL', 'return 1', '0'])
 
-  const setResult = await redis.hset('sdk:h', { a: 'one', b: 'two' })
-  assert.equal(setResult, 2)
-
-  const value = await redis.hget('sdk:h', 'a')
-  assert.equal(value, 'one')
+  assert.equal(result.status, 400)
+  assert.ok(result.error)
 })
 
-test('TTL command works', async () => {
-  await redis.set('sdk:ttl', '1', { ex: 60 })
-  const ttl = await redis.ttl('sdk:ttl')
-  assert.ok(ttl > 0)
+test('Connection-state commands are rejected before Redis execution', async () => {
+  const result = await rawCommand(['SELECT', '1'])
+
+  assert.equal(result.status, 400)
+  assert.ok(result.error)
 })
