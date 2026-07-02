@@ -266,10 +266,19 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.0
+
+      - name: Check install!
+        run: cosign version
 
       - name: Sign Docker image digest
         env:
           COSIGN_YES: "true"
+          IMAGE_REF: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
         run: |
-          cosign sign "${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
+          if [ -z "${{ steps.build.outputs.digest }}" ]; then
+            echo "Docker build digest is missing"
+            exit 1
+          fi
+
+          cosign sign "$IMAGE_REF"
