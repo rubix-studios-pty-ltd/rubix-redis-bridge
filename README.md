@@ -196,6 +196,25 @@ Health endpoints are mounted outside the API `ConcurrencyLimitLayer` and request
 
 The bridge handles both `SIGTERM` and `SIGINT`. Docker, Compose, systemd, and Kubernetes normally send `SIGTERM` on stop or redeploy, so graceful shutdown drains active requests instead of relying only on terminal `Ctrl+C`.
 
+## Metrics
+
+Prometheus metrics are exposed at:
+
+```txt
+GET /metrics
+```
+
+The endpoint returns process and Redis bridge counters in Prometheus text format.
+
+Useful metrics include:
+
+- rrb_auth_failed_total
+- rrb_command_denied_total
+- rrb_redis_operations_total
+- rrb_redis_operation_duration_seconds
+- rrb_inflight_redis_operations
+- rrb_configured_targets
+
 ## Runtime limits
 
 `RRB_MAX_CONCURRENCY` limits concurrent HTTP API requests across the bridge.
