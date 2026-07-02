@@ -24,6 +24,7 @@ pub struct BridgeConfig {
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
     pub request_timeout: Duration,
+    pub metrics_token: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -46,6 +47,7 @@ impl fmt::Debug for BridgeConfig {
             .field("max_body_bytes", &self.max_body_bytes)
             .field("max_concurrency", &self.max_concurrency)
             .field("request_timeout", &self.request_timeout)
+            .field("metrics_token_configured", &self.metrics_token.is_some())
             .finish()
     }
 }
@@ -94,6 +96,10 @@ impl BridgeConfig {
             bail!("RRB_REQUEST_TIMEOUT_MS must be greater than zero");
         }
 
+        let metrics_token = env_first(&["RRB_METRICS_TOKEN"])
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+
         let targets = load_targets()?;
         if targets.is_empty() {
             bail!("No Redis targets configured");
@@ -107,6 +113,7 @@ impl BridgeConfig {
             max_body_bytes,
             max_concurrency,
             request_timeout: Duration::from_millis(request_timeout_ms),
+            metrics_token,
         })
     }
 }

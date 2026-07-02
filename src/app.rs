@@ -26,6 +26,7 @@ pub struct AppState {
     security: SecurityPolicy,
     request_timeout: Duration,
     metrics: Metrics,
+    metrics_token: Option<String>,
 }
 
 struct RedisTarget {
@@ -83,12 +84,43 @@ impl AppState {
             security: config.security,
             request_timeout: config.request_timeout,
             metrics,
+            metrics_token: config.metrics_token,
         })
     }
 
     fn unauthorized(&self, message: impl Into<String>) -> ApiError {
         self.metrics.inc_auth_failed();
         ApiError::unauthorized(message)
+    }
+
+    fn resolve_metrics_auth(&self, headers: &HeaderMap) -> Result<(), ApiError> {
+        let Some(metrics_token) = self.metrics_token.as_deref() else {
+            return Err(self.unauthorized("Metrics authentication is not configured"));
+        };
+
+        let auth_header = headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| self.unauthorized("Missing/Invalid authorization header"))?;
+
+        let Some((scheme, token)) = auth_header.split_once(char::is_whitespace) else {
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
+        };
+
+        if !scheme.eq_ignore_ascii_case("Bearer") || token.trim().is_empty() {
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
+        }
+
+        if metrics_token
+            .as_bytes()
+            .ct_eq(token.trim().as_bytes())
+            .unwrap_u8()
+            != 1
+        {
+            return Err(self.unauthorized("Invalid token"));
+        }
+
+        Ok(())
     }
 
     fn resolve_target(&self, headers: &HeaderMap) -> Result<Arc<RedisTarget>, ApiError> {
@@ -219,7 +251,11 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
     )
 }
 
-pub async fn metrics(State(state): State<Arc<AppState>>) -> Response {
+pub async fn metrics(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Err(error) = state.resolve_metrics_auth(&headers) {
+        return error.into_response();
+    }
+
     match state.metrics.render() {
         Ok(body) => (
             StatusCode::OK,
