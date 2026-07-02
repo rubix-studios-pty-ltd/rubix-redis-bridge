@@ -84,3 +84,29 @@ test('Null and numeric responses match @upstash/redis expectations', async () =>
   await redis.set('sdk:n', '1')
   assert.equal(await redis.incr('sdk:n'), 2)
 })
+
+test('Missing key returns null', async () => {
+  await redis.del('sdk:missing')
+  assert.equal(await redis.get('sdk:missing'), null)
+})
+
+test('Numeric responses match SDK expectations', async () => {
+  await redis.set('sdk:n', '1')
+  assert.equal(await redis.incr('sdk:n'), 2)
+})
+
+test('Hash commands work', async () => {
+  await redis.del('sdk:h')
+
+  const setResult = await redis.hset('sdk:h', { a: 'one', b: 'two' })
+  assert.equal(setResult, 2)
+
+  const value = await redis.hget('sdk:h', 'a')
+  assert.equal(value, 'one')
+})
+
+test('TTL command works', async () => {
+  await redis.set('sdk:ttl', '1', { ex: 60 })
+  const ttl = await redis.ttl('sdk:ttl')
+  assert.ok(ttl > 0)
+})
