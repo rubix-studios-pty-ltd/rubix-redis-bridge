@@ -1,0 +1,7 @@
+{
+  "replace-with-strong-token": {
+    "rrb_id": "primary_redis",
+    "connection_string": "redis://default:replace-with-redis-password@redis:6379",
+    "max_connections": 100
+  }
+}

@@ -1,0 +1,176 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Rust and SDK tests
+    runs-on: ubuntu-24.04
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      RRB_MODE: env
+      RRB_HOST: 127.0.0.1
+      RRB_PORT: 8080
+      RRB_TOKEN: test-bridge-token
+      RRB_CONNECTION_STRING: redis://127.0.0.1:6379
+      RRB_ALLOWED_COMMANDS: PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL
+      RRB_REQUEST_TIMEOUT_MS: 5000
+      RRB_TEST_URL: http://127.0.0.1:8080
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test --locked
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install SDK test dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start bridge
+        run: |
+          cargo run --locked --release > rrb.log 2>&1 &
+          echo $! > rrb.pid
+
+          for i in {1..30}; do
+            if curl -fsS "$RRB_TEST_URL/healthz"; then
+              echo "Bridge is alive"
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          echo "Bridge failed to start"
+          cat rrb.log
+          exit 1
+
+      - name: Check readiness
+        run: |
+          curl -fsS "$RRB_TEST_URL/readyz"
+
+      - name: Run Upstash SDK compatibility tests
+        run: pnpm test:sdk
+
+      - name: Stop bridge
+        if: always()
+        run: |
+          if [ -f rrb.pid ]; then
+            kill "$(cat rrb.pid)" || true
+          fi
+
+      - name: Print bridge logs on failure
+        if: failure()
+        run: |
+          if [ -f rrb.log ]; then
+            cat rrb.log
+          fi
+
+  docker-build:
+    name: Docker build validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: rubix-redis-bridge:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test Docker image
+        run: |
+          docker network create rrb-test
+
+          docker run -d \
+            --name rrb-redis \
+            --network rrb-test \
+            redis:7-alpine
+
+          docker run -d \
+            --name rrb-bridge \
+            --network rrb-test \
+            -p 127.0.0.1:7777:8080 \
+            -e RRB_MODE=env \
+            -e RRB_TOKEN=test-bridge-token \
+            -e RRB_CONNECTION_STRING=redis://rrb-redis:6379 \
+            -e RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL \
+            rubix-redis-bridge:test
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:7777/healthz; then
+              echo "Docker image is alive"
+              break
+            fi
+
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:7777/ \
+            -H "Authorization: Bearer test-bridge-token" \
+            -H "Content-Type: application/json" \
+            -d '["PING"]'
+
+      - name: Print Docker logs on failure
+        if: failure()
+        run: |
+          docker logs rrb-bridge || true
+          docker logs rrb-redis || true
+
+      - name: Cleanup Docker smoke test
+        if: always()
+        run: |
+          docker rm -f rrb-bridge rrb-redis || true
+          docker network rm rrb-test || true

@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rust": "cargo test",
+    "test:sdk": "node --test tests/sdk/upstash.test.mjs",
+    "test:all": "cargo test && node --test tests/sdk/upstash.test.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.2",
+    "@upstash/redis": "latest"
+  }
+}

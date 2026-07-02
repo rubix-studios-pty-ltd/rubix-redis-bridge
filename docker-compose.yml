@@ -1,0 +1,45 @@
+services:
+  redis-bridge:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7777:8080"
+      # For your Tailscale-only pattern, use this instead:
+      # - "100.118.141.40:7777:8080"
+    environment:
+      RRB_MODE: env
+      RRB_TOKEN: ${RRB_TOKEN}
+      RRB_CONNECTION_STRING: "redis://default:${REDIS_TOKEN}@redis:6379"
+      RRB_MAX_CONNECTIONS: "100"
+      RRB_MAX_BODY_BYTES: "1048576"
+      RRB_MAX_CONCURRENCY: "1024"
+      RRB_MAX_PIPELINE_COMMANDS: "1000"
+      RRB_MAX_COMMAND_ARGS: "256"
+      RRB_MAX_ARG_BYTES: "262144"
+      RRB_REQUEST_TIMEOUT_MS: "5000"
+      RRB_ALLOWED_COMMANDS: "PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_TOKEN}"]
+    environment:
+      REDIS_TOKEN: ${REDIS_TOKEN}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_TOKEN}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis-data:
