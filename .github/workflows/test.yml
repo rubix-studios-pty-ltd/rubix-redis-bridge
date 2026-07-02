@@ -61,7 +61,7 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
 
-      - name: Run Rust tests
+      - name: Run tests
         run: cargo test --locked
 
       - name: Setup pnpm
@@ -74,7 +74,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install SDK test dependencies
+      - name: Install test dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build release binary
@@ -149,7 +149,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test Docker image
+      - name: Smoke test image
         run: |
           docker network create rrb-test
 
@@ -184,7 +184,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '["PING"]'
 
-      - name: Print Docker logs on failure
+      - name: Print logs on failure
         if: failure()
         run: |
           docker logs rrb-bridge || true
