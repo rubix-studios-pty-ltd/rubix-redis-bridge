@@ -70,12 +70,21 @@ jobs:
       - name: Install SDK test dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build release binary
+        run: cargo build --locked --release --bin rubix-redis-bridge
+
       - name: Start bridge
         run: |
-          cargo run --locked --release > rrb.log 2>&1 &
+          ./target/release/rubix-redis-bridge > rrb.log 2>&1 &
           echo $! > rrb.pid
 
-          for i in {1..30}; do
+          for i in {1..60}; do
+            if ! kill -0 "$(cat rrb.pid)" 2>/dev/null; then
+              echo "Bridge process exited early"
+              cat rrb.log
+              exit 1
+            fi
+
             if curl -fsS "$RRB_TEST_URL/healthz"; then
               echo "Bridge is alive"
               exit 0
@@ -85,6 +94,9 @@ jobs:
           done
 
           echo "Bridge failed to start"
+          echo "Open ports:"
+          ss -ltnp || true
+          echo "Bridge log:"
           cat rrb.log
           exit 1
 
@@ -144,6 +156,8 @@ jobs:
             --network rrb-test \
             -p 127.0.0.1:7777:8080 \
             -e RRB_MODE=env \
+            -e RRB_HOST=0.0.0.0 \
+            -e RRB_PORT=8080 \
             -e RRB_TOKEN=test-bridge-token \
             -e RRB_CONNECTION_STRING=redis://rrb-redis:6379 \
             -e RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL \
