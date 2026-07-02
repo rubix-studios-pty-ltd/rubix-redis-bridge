@@ -161,11 +161,7 @@ fn is_hard_denied_command(command_name: &str) -> bool {
         command_name,
         // Scripting and Redis Functions. These can execute nested Redis commands that bypass
         // this bridge's command allowlist/blocklist entirely.
-        "EVAL"
-            | "EVAL_RO"
-            | "EVALSHA"
-            | "EVALSHA_RO"
-            | "FCALL"
+        "FCALL"
             | "FCALL_RO"
             | "FUNCTION"
             | "SCRIPT"
