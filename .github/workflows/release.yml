@@ -15,6 +15,9 @@ concurrency:
   group: docker-release-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
