@@ -17,6 +17,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   validate:
@@ -56,6 +57,11 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
+      - name: Install cargo audit and cargo deny
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+
       - name: Check formatting
         run: cargo fmt --check
 
@@ -65,14 +71,18 @@ jobs:
       - name: Run Rust tests
         run: cargo test --locked
 
+      - name: Run cargo audit
+        run: cargo audit
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install SDK test dependencies
         run: pnpm install --frozen-lockfile
@@ -124,8 +134,8 @@ jobs:
             cat rrb.log
           fi
 
-  docker:
-    name: Publish Docker image
+  docker-scan:
+    name: Build and scan Docker image
     runs-on: ubuntu-24.04
     needs: validate
 
@@ -136,11 +146,57 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Validate Docker Hub image variable
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build local Docker image for scan
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: rubix-redis-bridge:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy Docker image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: rubix-redis-bridge:scan
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  docker:
+    name: Publish Docker image
+    runs-on: ubuntu-24.04
+    needs:
+      - validate
+      - docker-scan
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      image: ${{ env.IMAGE_NAME }}
+      digest: ${{ steps.build.outputs.digest }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate Docker Hub variables
         run: |
           if [ -z "${IMAGE_NAME}" ]; then
             echo "Repository variable DOCKERHUB_IMAGE is required."
             echo "Example: rubixstudios/rubix-redis-bridge"
+            exit 1
+          fi
+
+          if [ -z "${{ vars.DOCKERHUB_USERNAME }}" ]; then
+            echo "Repository variable DOCKERHUB_USERNAME is required."
             exit 1
           fi
 
@@ -192,7 +248,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image with SBOM and provenance
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -200,5 +257,16 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4
+
+      - name: Sign Docker image digest
+        env:
+          COSIGN_YES: "true"
+        run: |
+          cosign sign "${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
