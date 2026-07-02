@@ -277,6 +277,7 @@ Supported environment variables:
 | `RRB_MODE` | `file` | `env` or `file` |
 | `RRB_TOKEN` | none | HTTP bearer token in env mode |
 | `RRB_CONNECTION_STRING` | none | Redis URL in env mode |
+| `RRB_METRICS_TOKEN` | none | Bearer token required to access /metrics |
 | `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
 | `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | Multi-token file config |
 | `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternative file config path |
