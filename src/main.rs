@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod metrics;
 mod redis_value;
 mod security;
 
@@ -14,7 +15,7 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
-use crate::app::{AppState, command, healthz, multi_exec, pipeline, readyz, root};
+use crate::app::{AppState, command, healthz, metrics, multi_exec, pipeline, readyz, root};
 use crate::config::BridgeConfig;
 
 #[tokio::main]
@@ -32,7 +33,8 @@ async fn main() -> anyhow::Result<()> {
 
     let health = Router::new()
         .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz));
+        .route("/readyz", get(readyz))
+        .route("/metrics", get(metrics));
 
     let api = Router::new()
         .route("/", get(root).post(command))

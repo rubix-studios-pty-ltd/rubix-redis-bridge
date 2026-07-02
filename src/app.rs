@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::Context;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Json, State};
+use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use redis::aio::ConnectionManager;
@@ -16,6 +17,7 @@ use tokio::time::timeout;
 use tracing::{error, warn};
 
 use crate::config::{BridgeConfig, RedisTargetConfig};
+use crate::metrics::Metrics;
 use crate::redis_value::encode_redis_value;
 use crate::security::{RedisCommand, SecurityPolicy};
 
@@ -23,6 +25,8 @@ pub struct AppState {
     targets: HashMap<String, Arc<RedisTarget>>,
     security: SecurityPolicy,
     request_timeout: Duration,
+    metrics: Metrics,
+    metrics_token: Option<String>,
 }
 
 struct RedisTarget {
@@ -57,7 +61,7 @@ impl fmt::Debug for RedisTarget {
 
 impl AppState {
     pub fn new(config: BridgeConfig) -> anyhow::Result<Self> {
-        let targets = config
+        let targets: HashMap<String, Arc<RedisTarget>> = config
             .targets
             .into_iter()
             .map(|(token, target_config)| {
@@ -72,29 +76,65 @@ impl AppState {
             })
             .collect();
 
+        let metrics = Metrics::new()?;
+        metrics.configured_targets.set(targets.len() as i64);
+
         Ok(Self {
             targets,
             security: config.security,
             request_timeout: config.request_timeout,
+            metrics,
+            metrics_token: config.metrics_token,
         })
+    }
+
+    fn unauthorized(&self, message: impl Into<String>) -> ApiError {
+        self.metrics.inc_auth_failed();
+        ApiError::unauthorized(message)
+    }
+
+    fn resolve_metrics_auth(&self, headers: &HeaderMap) -> Result<(), ApiError> {
+        let Some(metrics_token) = self.metrics_token.as_deref() else {
+            return Err(self.unauthorized("Metrics authentication is not configured"));
+        };
+
+        let auth_header = headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| self.unauthorized("Missing/Invalid authorization header"))?;
+
+        let Some((scheme, token)) = auth_header.split_once(char::is_whitespace) else {
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
+        };
+
+        if !scheme.eq_ignore_ascii_case("Bearer") || token.trim().is_empty() {
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
+        }
+
+        if metrics_token
+            .as_bytes()
+            .ct_eq(token.trim().as_bytes())
+            .unwrap_u8()
+            != 1
+        {
+            return Err(self.unauthorized("Invalid token"));
+        }
+
+        Ok(())
     }
 
     fn resolve_target(&self, headers: &HeaderMap) -> Result<Arc<RedisTarget>, ApiError> {
         let auth_header = headers
             .get("authorization")
             .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| ApiError::unauthorized("Missing/Invalid authorization header"))?;
+            .ok_or_else(|| self.unauthorized("Missing/Invalid authorization header"))?;
 
         let Some((scheme, token)) = auth_header.split_once(char::is_whitespace) else {
-            return Err(ApiError::unauthorized(
-                "Missing/Invalid authorization header",
-            ));
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
         };
 
         if !scheme.eq_ignore_ascii_case("Bearer") || token.trim().is_empty() {
-            return Err(ApiError::unauthorized(
-                "Missing/Invalid authorization header",
-            ));
+            return Err(self.unauthorized("Missing/Invalid authorization header"));
         }
 
         let token = token.trim();
@@ -107,7 +147,7 @@ impl AppState {
             }
         }
 
-        matched_target.ok_or_else(|| ApiError::unauthorized("Invalid token"))
+        matched_target.ok_or_else(|| self.unauthorized("Invalid token"))
     }
 
     fn request_timeout(&self) -> Duration {
@@ -211,6 +251,25 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
     )
 }
 
+pub async fn metrics(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Err(error) = state.resolve_metrics_auth(&headers) {
+        return error.into_response();
+    }
+
+    match state.metrics.render() {
+        Ok(body) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, Metrics::content_type())],
+            body,
+        )
+            .into_response(),
+        Err(error) => {
+            error!(%error, "Failed to render Prometheus metrics");
+            ApiError::service_unavailable("Metrics unavailable").into_response()
+        }
+    }
+}
+
 pub async fn command(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -229,10 +288,23 @@ pub async fn command(
 
     let command = match state.security.parse_single_command(&value) {
         Ok(command) => command,
-        Err(error) => return ApiError::bad_request(error.to_string()).into_response(),
+        Err(error) => {
+            state
+                .metrics
+                .inc_command_denied(target.config.rrb_id.as_str(), "single");
+            return ApiError::bad_request(error.to_string()).into_response();
+        }
     };
 
-    match execute_command(target, command, base64_encoding, state.request_timeout()).await {
+    match execute_command(
+        target,
+        command,
+        base64_encoding,
+        state.request_timeout(),
+        state.metrics.clone(),
+    )
+    .await
+    {
         Ok(value) => json_response(StatusCode::OK, json!({ "result": value })),
         Err(error) => error.into_response(),
     }
@@ -256,10 +328,23 @@ pub async fn pipeline(
 
     let commands = match state.security.parse_command_list(&value) {
         Ok(commands) => commands,
-        Err(error) => return ApiError::bad_request(error.to_string()).into_response(),
+        Err(error) => {
+            state
+                .metrics
+                .inc_command_denied(target.config.rrb_id.as_str(), "pipeline");
+            return ApiError::bad_request(error.to_string()).into_response();
+        }
     };
 
-    match execute_pipeline(target, commands, base64_encoding, state.request_timeout()).await {
+    match execute_pipeline(
+        target,
+        commands,
+        base64_encoding,
+        state.request_timeout(),
+        state.metrics.clone(),
+    )
+    .await
+    {
         Ok(response_items) => json_response(StatusCode::OK, Value::Array(response_items)),
         Err(error) => error.into_response(),
     }
@@ -270,9 +355,12 @@ async fn execute_pipeline(
     commands: Vec<RedisCommand>,
     base64_encoding: bool,
     request_timeout: Duration,
+    metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     let target_id = target.config.rrb_id.clone();
     let target_id_for_task = target_id.clone();
+
+    let operation_metrics = metrics.begin_redis_operation(target_id.clone(), "pipeline");
 
     let result = timeout(request_timeout, async move {
         let _permit = target.operation_limit.acquire().await.map_err(|error| {
@@ -317,8 +405,17 @@ async fn execute_pipeline(
     .await;
 
     match result {
-        Ok(result) => result,
+        Ok(Ok(items)) => {
+            operation_metrics.success();
+            Ok(items)
+        }
+        Ok(Err(error)) => {
+            operation_metrics.error();
+            Err(error)
+        }
         Err(_) => {
+            operation_metrics.timeout();
+
             warn!(
                 target = %target_id,
                 timeout_ms = request_timeout.as_millis(),
@@ -348,10 +445,23 @@ pub async fn multi_exec(
 
     let commands = match state.security.parse_command_list(&value) {
         Ok(commands) => commands,
-        Err(error) => return ApiError::bad_request(error.to_string()).into_response(),
+        Err(error) => {
+            state
+                .metrics
+                .inc_command_denied(target.config.rrb_id.as_str(), "multi_exec");
+            return ApiError::bad_request(error.to_string()).into_response();
+        }
     };
 
-    match execute_transaction(target, commands, base64_encoding, state.request_timeout()).await {
+    match execute_transaction(
+        target,
+        commands,
+        base64_encoding,
+        state.request_timeout(),
+        state.metrics.clone(),
+    )
+    .await
+    {
         Ok(values) => {
             let response_items = values
                 .into_iter()
@@ -368,9 +478,12 @@ async fn execute_command(
     command: RedisCommand,
     base64_encoding: bool,
     request_timeout: Duration,
+    metrics: Metrics,
 ) -> Result<Value, ApiError> {
     let target_id = target.config.rrb_id.clone();
     let target_id_for_task = target_id.clone();
+
+    let operation_metrics = metrics.begin_redis_operation(target_id.clone(), "command");
 
     let result = timeout(request_timeout, async move {
         let _permit = target.operation_limit.acquire().await.map_err(|error| {
@@ -390,6 +503,7 @@ async fn execute_command(
 
         let result: redis::RedisResult<redis::Value> =
             redis_command.query_async(&mut connection).await;
+
         result
             .map(|value| encode_redis_value(value, base64_encoding))
             .map_err(redis_error_to_api_error)
@@ -397,9 +511,23 @@ async fn execute_command(
     .await;
 
     match result {
-        Ok(result) => result,
+        Ok(Ok(value)) => {
+            operation_metrics.success();
+            Ok(value)
+        }
+        Ok(Err(error)) => {
+            operation_metrics.error();
+            Err(error)
+        }
         Err(_) => {
-            warn!(target = %target_id, timeout_ms = request_timeout.as_millis(), "Redis command timed out");
+            operation_metrics.timeout();
+
+            warn!(
+                target = %target_id,
+                timeout_ms = request_timeout.as_millis(),
+                "Redis command timed out"
+            );
+
             Err(ApiError::gateway_timeout("Redis command timed out"))
         }
     }
@@ -410,9 +538,12 @@ async fn execute_transaction(
     commands: Vec<RedisCommand>,
     base64_encoding: bool,
     request_timeout: Duration,
+    metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     let target_id = target.config.rrb_id.clone();
     let target_id_for_task = target_id.clone();
+
+    let operation_metrics = metrics.begin_redis_operation(target_id.clone(), "multi_exec");
 
     let result = timeout(request_timeout, async move {
         let _permit = target.operation_limit.acquire().await.map_err(|error| {
@@ -430,12 +561,14 @@ async fn execute_transaction(
 
         for command in commands {
             pipe.cmd(command.name.as_str());
+
             for arg in command.args {
                 pipe.arg(arg.as_slice());
             }
         }
 
         let result: redis::RedisResult<Vec<redis::Value>> = pipe.query_async(&mut connection).await;
+
         result
             .map(|values| {
                 values
@@ -448,9 +581,23 @@ async fn execute_transaction(
     .await;
 
     match result {
-        Ok(result) => result,
+        Ok(Ok(values)) => {
+            operation_metrics.success();
+            Ok(values)
+        }
+        Ok(Err(error)) => {
+            operation_metrics.error();
+            Err(error)
+        }
         Err(_) => {
-            warn!(target = %target_id, timeout_ms = request_timeout.as_millis(), "Redis transaction timed out");
+            operation_metrics.timeout();
+
+            warn!(
+                target = %target_id,
+                timeout_ms = request_timeout.as_millis(),
+                "Redis transaction timed out"
+            );
+
             Err(ApiError::gateway_timeout("Redis transaction timed out"))
         }
     }

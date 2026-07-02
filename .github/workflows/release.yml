@@ -24,7 +24,7 @@ env:
 
 jobs:
   validate:
-    name: Validate before release
+    name: Validate release
     runs-on: ubuntu-24.04
 
     services:
@@ -71,7 +71,7 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
 
-      - name: Run Rust tests
+      - name: Run tests
         run: cargo test --locked
 
       - name: Run cargo audit
@@ -87,7 +87,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install SDK test dependencies
+      - name: Install test dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build release binary
@@ -120,7 +120,7 @@ jobs:
           cat rrb.log
           exit 1
 
-      - name: Run SDK compatibility tests
+      - name: Run compatibility tests
         run: pnpm test:sdk
 
       - name: Stop bridge
@@ -138,7 +138,7 @@ jobs:
           fi
 
   docker-scan:
-    name: Build and scan Docker image
+    name: Build and scan image
     runs-on: ubuntu-24.04
     needs: validate
 
@@ -152,7 +152,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build local Docker image for scan
+      - name: Build local image for scan
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -162,7 +162,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trivy Docker image scan
+      - name: Trivy image scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: rubix-redis-bridge:scan
@@ -251,7 +251,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
-      - name: Build and push Docker image with SBOM and provenance
+      - name: Build and push image with SBOM and provenance
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -268,7 +268,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.1.0
 
-      - name: Check install!
+      - name: Check Cosign
         run: cosign version
 
       - name: Sign Docker image digest

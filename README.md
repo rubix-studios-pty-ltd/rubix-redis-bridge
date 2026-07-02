@@ -143,7 +143,7 @@ The following commands are blocked inside the bridge regardless of allowlist or 
 Scripting and Redis Functions are hard-denied because they can execute nested Redis commands internally and bypass an outer command allowlist:
 
 ```txt
-EVAL, EVAL_RO, EVALSHA, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
+FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
 Multiplexed administrative command families are hard-denied as whole families because safe and dangerous operations share the same top-level command name:
@@ -181,7 +181,7 @@ For public or semi-public deployments, set `RRB_ALLOWED_COMMANDS` yourself and o
 Example narrow allowlist:
 
 ```bash
-RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL
+RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVALSHA,EVAL
 ```
 
 ## Health and readiness
@@ -195,6 +195,25 @@ RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL
 Health endpoints are mounted outside the API `ConcurrencyLimitLayer` and request body limit. This prevents Docker, systemd, Kubernetes, or external probes from queueing behind slow Redis traffic and falsely restarting the bridge under load.
 
 The bridge handles both `SIGTERM` and `SIGINT`. Docker, Compose, systemd, and Kubernetes normally send `SIGTERM` on stop or redeploy, so graceful shutdown drains active requests instead of relying only on terminal `Ctrl+C`.
+
+## Metrics
+
+Prometheus metrics are exposed at:
+
+```txt
+GET /metrics
+```
+
+The endpoint returns process and Redis bridge counters in Prometheus text format.
+
+Useful metrics include:
+
+- rrb_auth_failed_total
+- rrb_command_denied_total
+- rrb_redis_operations_total
+- rrb_redis_operation_duration_seconds
+- rrb_inflight_redis_operations
+- rrb_configured_targets
 
 ## Runtime limits
 
@@ -258,6 +277,7 @@ Supported environment variables:
 | `RRB_MODE` | `file` | `env` or `file` |
 | `RRB_TOKEN` | none | HTTP bearer token in env mode |
 | `RRB_CONNECTION_STRING` | none | Redis URL in env mode |
+| `RRB_METRICS_TOKEN` | none | Bearer token required to access /metrics |
 | `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
 | `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | Multi-token file config |
 | `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternative file config path |

@@ -159,13 +159,9 @@ fn reject_hard_denied_command(command_name: &str) -> anyhow::Result<()> {
 fn is_hard_denied_command(command_name: &str) -> bool {
     matches!(
         command_name,
-        // Scripting and Redis Functions. These can execute nested Redis commands that bypass
-        // this bridge's command allowlist/blocklist entirely.
-        "EVAL"
-            | "EVAL_RO"
-            | "EVALSHA"
-            | "EVALSHA_RO"
-            | "FCALL"
+        // Redis Functions and script management. EVAL/EVALSHA are controlled by the normal
+        // allowlist and optional Lua gates, but SCRIPT/FUNCTION/FCALL remain hard-denied.
+        "FCALL"
             | "FCALL_RO"
             | "FUNCTION"
             | "SCRIPT"
@@ -280,32 +276,12 @@ mod tests {
     }
 
     #[test]
-    fn denies_script_even_when_allowed() {
+    fn denies_script_management_even_when_allowed() {
         let mut policy = policy();
-        policy.allowed_commands.insert("EVAL".to_string());
+        policy.allowed_commands.insert("SCRIPT".to_string());
 
         let err = policy
-            .parse_single_command(&serde_json::json!([
-                "EVAL",
-                "return redis.call('GET','x')",
-                0
-            ]))
-            .unwrap_err();
-
-        assert!(err.to_string().contains("hard-denied"));
-    }
-
-    #[test]
-    fn denies_eval_ro_even_when_allowed() {
-        let mut policy = policy();
-        policy.allowed_commands.insert("EVAL_RO".to_string());
-
-        let err = policy
-            .parse_single_command(&serde_json::json!([
-                "EVAL_RO",
-                "return redis.call('GET','x')",
-                0
-            ]))
+            .parse_single_command(&serde_json::json!(["SCRIPT", "LOAD", "return 1"]))
             .unwrap_err();
 
         assert!(err.to_string().contains("hard-denied"));
@@ -378,7 +354,7 @@ mod tests {
     #[test]
     fn validate_rejects_hard_denied_allowed_commands() {
         let mut policy = policy();
-        policy.allowed_commands.insert("EVAL".to_string());
+        policy.allowed_commands.insert("FCALL".to_string());
 
         let err = policy.validate().unwrap_err();
 
