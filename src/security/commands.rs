@@ -1,5 +1,3 @@
-// TODO: move command constant to root shared with config.
-
 pub(crate) const DENIED_COMMANDS: &[&str] = &[
     "EVAL",
     "EVAL_RO",
