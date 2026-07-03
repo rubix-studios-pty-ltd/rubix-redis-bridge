@@ -4,11 +4,11 @@ Rubix Redis Bridge is a small Rust HTTP bridge for Redis.
 
 It provides a secure, Docker-deployable Redis HTTP API with an Upstash-style request and response format. It is intended for private infrastructure, internal services, Docker deployments, Tailscale access, and controlled application integrations that need Redis over HTTP without exposing raw Redis directly.
 
-[![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions)
+[![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions)
 
 [![CodeQL](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/codeql.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/security/code-scanning)
 
-[![Dependabot Enabled](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates)
 
 [![Socket](https://socket.dev/api/badge/npm/package/@rubixstudios/rubix-redis-bridge)](https://socket.dev/github/repo/rubix-studios-pty-ltd/rubix-redis-bridge)
 
