@@ -2,19 +2,10 @@ use std::collections::HashSet;
 
 use serde_json::{Value, json};
 
-use crate::commands::DENIED_COMMANDS;
+use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
 
 use super::SecurityPolicy;
 use super::deny::{denied_commands, is_denied_command};
-
-const CONNECTION_COMMANDS: &[&str] = &[
-    "SELECT",
-    "HELLO",
-    "RESET",
-    "ASKING",
-    "READONLY",
-    "READWRITE",
-];
 
 fn policy() -> SecurityPolicy {
     SecurityPolicy {

@@ -10,10 +10,8 @@ use std::os::unix::fs::PermissionsExt;
 use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
 
+use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
-
-const DEFAULT_ALLOWED_COMMANDS: &str = "APPEND,BITCOUNT,BITOP,BITPOS,DECR,DECRBY,DEL,EXISTS,EXPIRE,EXPIREAT,GET,GETBIT,GETDEL,GETEX,GETRANGE,GETSET,HDEL,HEXISTS,HGET,HGETALL,HINCRBY,HINCRBYFLOAT,HKEYS,HLEN,HMGET,HMSET,HRANDFIELD,HSCAN,HSET,HSETNX,HSTRLEN,HVALS,INCR,INCRBY,INCRBYFLOAT,LINDEX,LLEN,LMOVE,LPOP,LPOS,LPUSH,LRANGE,LREM,LSET,LTRIM,MGET,MSET,MSETNX,PERSIST,PEXPIRE,PEXPIREAT,PFADD,PFCOUNT,PFMERGE,PING,PSETEX,PTTL,RPOP,RPOPLPUSH,RPUSH,SADD,SCAN,SCARD,SDIFF,SDIFFSTORE,SET,SETBIT,SETEX,SETNX,SETRANGE,SINTER,SINTERSTORE,SISMEMBER,SMEMBERS,SMISMEMBER,SMOVE,SPOP,SRANDMEMBER,SREM,SSCAN,STRLEN,SUNION,SUNIONSTORE,TTL,TYPE,UNLINK,XADD,XDEL,XLEN,XRANGE,XREVRANGE,XTRIM,ZADD,ZCARD,ZCOUNT,ZDIFF,ZDIFFSTORE,ZINCRBY,ZINTER,ZINTERSTORE,ZLEXCOUNT,ZMSCORE,ZPOPMAX,ZPOPMIN,ZRANGE,ZRANGEBYLEX,ZRANGEBYSCORE,ZRANK,ZREM,ZREMRANGEBYLEX,ZREMRANGEBYRANK,ZREMRANGEBYSCORE,ZREVRANGE,ZREVRANGEBYLEX,ZREVRANGEBYSCORE,ZREVRANK,ZSCAN,ZSCORE,ZUNION,ZUNIONSTORE";
-const DEFAULT_BLOCKED_COMMANDS: &str = "ACL,AUTH,ASKING,BGREWRITEAOF,BGSAVE,BLMOVE,BLMPOP,BLPOP,BRPOP,BRPOPLPUSH,BZPOPMAX,BZPOPMIN,BZMPOP,CLIENT,CLUSTER,COMMAND,CONFIG,DBSIZE,DEBUG,DISCARD,EVAL,EVAL_RO,EVALSHA,EVALSHA_RO,EXEC,FCALL,FCALL_RO,FLUSHALL,FLUSHDB,FUNCTION,HELLO,INFO,KEYS,LASTSAVE,LATENCY,MEMORY,MIGRATE,MODULE,MONITOR,MULTI,PSUBSCRIBE,PSYNC,PUNSUBSCRIBE,PUBLISH,PUBSUB,QUIT,READONLY,READWRITE,REPLCONF,REPLICAOF,RESET,RESTORE,ROLE,SAVE,SCRIPT,SELECT,SHUTDOWN,SLAVEOF,SLOWLOG,SORT,SORT_RO,SSUBSCRIBE,SUNSUBSCRIBE,SUBSCRIBE,SWAPDB,SYNC,UNSUBSCRIBE,UNWATCH,WAIT,WAITAOF,WATCH,XGROUP,XREAD,XREADGROUP";
 
 #[derive(Clone)]
 pub struct BridgeConfig {
@@ -75,9 +73,11 @@ impl BridgeConfig {
         let request_timeout_ms: u64 = parse_env_or_default("RRB_REQUEST_TIMEOUT_MS", 5_000)?;
 
         let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
-            .unwrap_or_else(|| parse_csv(DEFAULT_ALLOWED_COMMANDS));
+            .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
 
-        let mut blocked_commands = parse_csv(DEFAULT_BLOCKED_COMMANDS);
+        let mut blocked_commands = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])?
+            .unwrap_or_else(|| parse_command_list(DENIED_COMMANDS));
+
         if let Some(extra_blocked_commands) = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])? {
             blocked_commands.extend(extra_blocked_commands);
         }
@@ -85,10 +85,10 @@ impl BridgeConfig {
         let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
 
         if upstash_ratelimit {
-            allowed_commands.extend(["EVAL", "EVALSHA", "SCRIPT"].into_iter().map(String::from));
-            blocked_commands.remove("EVAL");
-            blocked_commands.remove("EVALSHA");
-            blocked_commands.remove("SCRIPT");
+            for &command in RATELIMIT_COMMANDS {
+                allowed_commands.insert(command.to_string());
+                blocked_commands.remove(command);
+            }
         }
 
         let security = SecurityPolicy {
@@ -271,6 +271,14 @@ fn parse_bool_env(key: &str, default: bool) -> anyhow::Result<bool> {
         Err(std::env::VarError::NotPresent) => Ok(default),
         Err(error) => Err(anyhow!("Failed to read {key}: {error}")),
     }
+}
+
+fn parse_command_list(commands: &[&str]) -> HashSet<String> {
+    commands
+        .iter()
+        .map(|command| command.trim().to_ascii_uppercase())
+        .filter(|command| !command.is_empty())
+        .collect()
 }
 
 fn env_first(keys: &[&str]) -> Option<String> {
