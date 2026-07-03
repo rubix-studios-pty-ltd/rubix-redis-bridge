@@ -8,11 +8,11 @@ use tokio::time::timeout;
 use tracing::{error, warn};
 
 use crate::metrics::Metrics;
-use crate::redis_value::encode_value;
 use crate::security::RedisCommand;
 
 use super::error::ApiError;
 use super::redis_error::{redis_api_error, redis_error_message};
+use super::redis_value::encode_value;
 use super::state::RedisTarget;
 
 pub(crate) async fn execute_command(

@@ -1,7 +1,6 @@
 mod app;
 mod config;
 mod metrics;
-mod redis_value;
 mod security;
 
 use std::net::SocketAddr;

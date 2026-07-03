@@ -3,6 +3,7 @@ mod error;
 mod handlers;
 mod redis_error;
 mod redis_exec;
+mod redis_value;
 mod response;
 mod state;
 
