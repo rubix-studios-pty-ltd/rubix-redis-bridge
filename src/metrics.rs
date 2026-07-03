@@ -95,7 +95,7 @@ impl Metrics {
         "text/plain; version=0.0.4; charset=utf-8"
     }
 
-    pub fn begin_redis_operation(
+    pub fn begin_operation(
         &self,
         target: impl Into<String>,
         kind: &'static str,

@@ -3,7 +3,7 @@ use redis::Value as RedisValue;
 use serde_json::{Map, Number, Value, json};
 use tracing::warn;
 
-pub fn encode_redis_value(value: RedisValue, base64_encoding: bool) -> Value {
+pub fn encode_value(value: RedisValue, base64_encoding: bool) -> Value {
     match value {
         RedisValue::Nil => Value::Null,
         RedisValue::Int(value) => json!(value),
@@ -16,14 +16,14 @@ pub fn encode_redis_value(value: RedisValue, base64_encoding: bool) -> Value {
 
         RedisValue::Attribute { data, attributes } => json!({
             "type": "attribute",
-            "data": encode_redis_value(*data, base64_encoding),
+            "data": encode_value(*data, base64_encoding),
             "attributes": encode_map(attributes, base64_encoding),
         }),
 
         RedisValue::Set(values) => Value::Array(
             values
                 .into_iter()
-                .map(|value| encode_redis_value(value, base64_encoding))
+                .map(|value| encode_value(value, base64_encoding))
                 .collect(),
         ),
 
@@ -65,7 +65,7 @@ fn encode_array(values: Vec<RedisValue>, base64_encoding: bool) -> Value {
     Value::Array(
         values
             .into_iter()
-            .map(|value| encode_redis_value(value, base64_encoding))
+            .map(|value| encode_value(value, base64_encoding))
             .collect(),
     )
 }
@@ -76,8 +76,8 @@ fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> 
     let mut can_encode_as_object = true;
 
     for (key, value) in entries {
-        let encoded_key = encode_redis_value(key, base64_encoding);
-        let encoded_value = encode_redis_value(value, base64_encoding);
+        let encoded_key = encode_value(key, base64_encoding);
+        let encoded_value = encode_value(value, base64_encoding);
 
         if let Some(object_key) = json_to_object(&encoded_key) {
             if object.insert(object_key, encoded_value.clone()).is_some() {
