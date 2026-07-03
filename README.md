@@ -2,7 +2,7 @@
 
 Rubix Redis Bridge is a small Rust HTTP bridge for Redis.
 
-It provides a secure, Docker-deployable Redis HTTP API with an Upstash-style request and response format. It is intended for private infrastructure, internal services, Docker deployments, Tailscale access, and controlled application integrations that need Redis over HTTP without exposing raw Redis directly.
+It provides a secure, production-ready harden Redis HTTP API with an Upstash-style request and response. It is intended for private infrastructure, internal services, Docker deployments, and controlled application integrations that need Redis over HTTP without exposing Redis directly.
 
 [![Tests](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/test.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/test.yml) [![Release](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml) [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -10,7 +10,7 @@ It provides a secure, Docker-deployable Redis HTTP API with an Upstash-style req
 
 Rubix Redis Bridge supports the core Upstash-style HTTP command format used by `@upstash/redis`.
 
-It is not a full Upstash Redis API clone. Available commands are controlled by `RRB_ALLOWED_COMMANDS`, and dangerous Redis command families are hard-denied by the bridge regardless of allowlist configuration.
+Available commands are controlled by `RRB_ALLOWED_COMMANDS`, and dangerous Redis command families are hard-denied by the bridge regardless of allowlist configuration.
 
 Implemented endpoints:
 
@@ -32,15 +32,15 @@ Authentication uses bearer tokens:
 Authorization: Bearer <token>
 ```
 
-The bearer scheme is parsed case-insensitively, so `Bearer`, `bearer`, and `BEARER` are accepted.
+The bearer scheme is case-insensitive, so `Bearer`, `bearer`, or `BEARER` is acceptable.
 
-Single command format:
+Single command:
 
 ```json
 ["SET", "hello", "world"]
 ```
 
-Pipeline format:
+Pipeline:
 
 ```json
 [
@@ -49,7 +49,7 @@ Pipeline format:
 ]
 ```
 
-Transaction format:
+Transaction:
 
 ```json
 [
@@ -85,7 +85,7 @@ Example narrow production allowlist:
 RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
 ```
 
-With that allowlist, SDK methods using commands outside that set will fail by design.
+With allowlist, SDK methods using commands outside that set will fail by design.
 
 ## Upstash Ratelimit
 
@@ -116,7 +116,7 @@ SCRIPT
 
 This is required because `@upstash/ratelimit` may call `EVALSHA` first, then fall back to `EVAL` when Redis does not already have the script cached.
 
-Enable this only for trusted applications and private deployments. Lua scripting gives the caller more power than simple Redis data commands.
+Lua scripting gives the caller more power than simple Redis data commands.
 
 Example production allowlist for Upstash Redis and Upstash Ratelimit compatibility:
 
