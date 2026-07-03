@@ -172,7 +172,7 @@ fn load_file_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
     let path = env_first(&["RRB_CONFIG_FILE", "TOKEN_RESOLUTION_FILE_PATH"])
         .unwrap_or_else(|| "/app/rrb-config/tokens.json".to_string());
 
-    warn_if_token_file_permissions_are_broad(&path);
+    file_premission(&path);
 
     let data = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read token config file: {path}"))?;
@@ -296,7 +296,7 @@ fn derived_rrb_id(token: &str) -> String {
 }
 
 #[cfg(unix)]
-fn warn_if_token_file_permissions_are_broad(path: &str) {
+fn file_premission(path: &str) {
     use tracing::warn;
 
     let Ok(metadata) = fs::metadata(path) else {
@@ -314,14 +314,14 @@ fn warn_if_token_file_permissions_are_broad(path: &str) {
 }
 
 #[cfg(not(unix))]
-fn warn_if_token_file_permissions_are_broad(_path: &str) {}
+fn file_premission(_path: &str) {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn csv_parser_normalizes_case() {
+    fn parses_csv_commands() {
         let commands = parse_csv("get, Set , DEL");
         assert!(commands.contains("GET"));
         assert!(commands.contains("SET"));
@@ -329,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn derived_id_does_not_return_shared_default() {
+    fn derives_custom_id() {
         assert_ne!(derived_rrb_id("abc123"), default_rrb_id());
     }
 }

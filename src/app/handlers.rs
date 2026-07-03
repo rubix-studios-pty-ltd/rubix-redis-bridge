@@ -72,7 +72,7 @@ pub async fn command(
         Err(_) => return ApiError::bad_request("Invalid JSON body").into_response(),
     };
 
-    let command = match state.security().parse_single_command(&value) {
+    let command = match state.security().parse_command(&value) {
         Ok(command) => command,
         Err(error) => {
             state.metrics().inc_command_denied(target.id(), "single");
