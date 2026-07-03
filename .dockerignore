@@ -1,7 +1,15 @@
 target
 .git
+.github
 .gitignore
-.env
+.env*
 *.log
 node_modules
 tests
+
+biome.json
+package.json
+pnpm-lock.yaml
+token.example.json
+
+CODE_OF_CONDUCT.md
