@@ -10,8 +10,6 @@ It provides a secure, Docker-deployable Redis HTTP API with an Upstash-style req
 
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates)
 
-[![Socket](https://socket.dev/api/badge/npm/package/@rubixstudios/rubix-redis-bridge)](https://socket.dev/github/repo/rubix-studios-pty-ltd/rubix-redis-bridge)
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Compatibility
