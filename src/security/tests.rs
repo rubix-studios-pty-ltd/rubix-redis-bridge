@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde_json::{Value, json};
 
 use super::SecurityPolicy;
-use super::commands::{DENIED_COMMANDS};
+use super::commands::DENIED_COMMANDS;
 use super::deny::{denied_commands, is_denied_command};
 
 const CONNECTION_COMMANDS: &[&str] = &[
@@ -70,12 +70,9 @@ fn reject_denied_commands() {
 fn reject_connection_commands() {
     let mut policy = policy();
 
-    policy.allowed_commands.extend(
-        CONNECTION_COMMANDS
-            .iter()
-            .copied()
-            .map(String::from),
-    );
+    policy
+        .allowed_commands
+        .extend(CONNECTION_COMMANDS.iter().copied().map(String::from));
 
     for command in CONNECTION_COMMANDS.iter().copied() {
         error_contains(&policy, json!([command]), "hard-denied");

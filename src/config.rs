@@ -172,7 +172,7 @@ fn load_file_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
     let path = env_first(&["RRB_CONFIG_FILE", "TOKEN_RESOLUTION_FILE_PATH"])
         .unwrap_or_else(|| "/app/rrb-config/tokens.json".to_string());
 
-    file_premission(&path);
+    file_permissions(&path);
 
     let data = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read token config file: {path}"))?;
@@ -296,7 +296,7 @@ fn derived_rrb_id(token: &str) -> String {
 }
 
 #[cfg(unix)]
-fn file_premission(path: &str) {
+fn file_permissions(path: &str) {
     use tracing::warn;
 
     let Ok(metadata) = fs::metadata(path) else {
@@ -314,7 +314,7 @@ fn file_premission(path: &str) {
 }
 
 #[cfg(not(unix))]
-fn file_premission(_path: &str) {}
+fn file_permissions(_path: &str) {}
 
 #[cfg(test)]
 mod tests {
