@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:7777'
@@ -233,10 +234,11 @@ test('Unauthorized requests are rejected', async () => {
 })
 
 test('Dangerous commands are rejected before Redis execution', async () => {
-  const result = await rawCommand(['EVAL', 'return 1', '0'])
+  const result = await rawCommand(['FCALL', 'some_function', 0])
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
+  assert.match(result.error, /hard-denied|not allowed/i)
 })
 
 test('Connection-state commands are rejected before Redis execution', async () => {
@@ -244,4 +246,64 @@ test('Connection-state commands are rejected before Redis execution', async () =
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
+})
+
+test('Upstash ratelimit fixed window works through the bridge', async () => {
+  if (process.env.RRB_UPSTASH_RATELIMIT !== 'true') {
+    test.skip('RRB_UPSTASH_RATELIMIT=true is required')
+  }
+
+  const prefix = `sdk:ratelimit:${Date.now()}:fixed`
+  const identifier = 'user-1'
+
+  const ratelimit = new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(2, '10 s'),
+    prefix,
+    analytics: false,
+  })
+
+  const first = await ratelimit.limit(identifier)
+  assert.equal(first.success, true)
+  assert.equal(first.limit, 2)
+  assert.equal(first.remaining, 1)
+
+  const second = await ratelimit.limit(identifier)
+  assert.equal(second.success, true)
+  assert.equal(second.limit, 2)
+  assert.equal(second.remaining, 0)
+
+  const third = await ratelimit.limit(identifier)
+  assert.equal(third.success, false)
+  assert.equal(third.limit, 2)
+  assert.equal(third.remaining, 0)
+})
+
+test('Upstash ratelimit EVALSHA fallback to EVAL works after SCRIPT FLUSH', async () => {
+  if (process.env.RRB_UPSTASH_RATELIMIT !== 'true') {
+    test.skip('RRB_UPSTASH_RATELIMIT=true is required')
+  }
+
+  const flush = await rawCommand(['SCRIPT', 'FLUSH'])
+  assert.equal(flush.status, 200)
+
+  const prefix = `sdk:ratelimit:${Date.now()}:fallback`
+  const identifier = 'user-1'
+
+  const ratelimit = new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(1, '10 s'),
+    prefix,
+    analytics: false,
+  })
+
+  const first = await ratelimit.limit(identifier)
+  assert.equal(first.success, true)
+  assert.equal(first.limit, 1)
+  assert.equal(first.remaining, 0)
+
+  const second = await ratelimit.limit(identifier)
+  assert.equal(second.success, false)
+  assert.equal(second.limit, 1)
+  assert.equal(second.remaining, 0)
 })

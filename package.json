@@ -1,7 +1,7 @@
 {
   "name": "rubix-redis-bridge",
   "title": "Rubix Redis Bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Secure Rust HTTP bridge for Redis with Upstash-style API compatibility, command allowlisting, hard-denied dangerous Redis commands, Docker deployment, and SDK compatibility tests.",
   "license": "MIT",
   "private": true,
@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
-    "@upstash/redis": "latest"
+    "@upstash/redis": "latest",
+    "@upstash/ratelimit": "latest"
   }
 }
