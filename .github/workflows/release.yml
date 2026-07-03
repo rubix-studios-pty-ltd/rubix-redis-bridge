@@ -77,6 +77,9 @@ jobs:
       - name: Run cargo audit
         run: cargo audit
 
+      - name: Run cargo deny
+        run: cargo deny check
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
@@ -266,7 +269,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.1.0
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Check Cosign
         run: cosign version
