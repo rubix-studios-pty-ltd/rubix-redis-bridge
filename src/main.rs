@@ -31,6 +31,14 @@ async fn main() -> anyhow::Result<()> {
     let max_concurrency = config.max_concurrency;
     let state = Arc::new(AppState::new(config)?);
 
+    info!(
+        bind = %bind,
+        target_count = state.target_count(),
+        max_concurrency,
+        body_limit,
+        "Redis bridge starting"
+    );
+
     let health = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
