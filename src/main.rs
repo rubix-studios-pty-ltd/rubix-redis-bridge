@@ -1,4 +1,5 @@
 mod app;
+mod commands;
 mod config;
 mod metrics;
 mod security;

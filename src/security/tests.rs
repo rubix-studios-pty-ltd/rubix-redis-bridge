@@ -2,8 +2,9 @@ use std::collections::HashSet;
 
 use serde_json::{Value, json};
 
+use crate::commands::DENIED_COMMANDS;
+
 use super::SecurityPolicy;
-use super::commands::DENIED_COMMANDS;
 use super::deny::{denied_commands, is_denied_command};
 
 const CONNECTION_COMMANDS: &[&str] = &[
