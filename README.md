@@ -362,7 +362,7 @@ docker run --rm -p 7777:8080 \
   -e RRB_MAX_CONNECTIONS='100' \
   -e RRB_REQUEST_TIMEOUT_MS='5000' \
   -e RRB_ALLOWED_COMMANDS='PING,GET,SET,DEL,EXISTS,EXPIRE,TTL' \
-  rubix-redis-bridge:latest
+  rubixvi/rubix-redis-bridge:latest
 ```
 
 Supported environment variables:
