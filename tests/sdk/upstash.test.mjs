@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:7777'
@@ -32,6 +33,44 @@ async function rawCommand(command) {
     result: body?.result,
     error: body?.error,
   }
+}
+
+function policy(result) {
+  return (
+    result.status === 400 &&
+    typeof result.error === 'string' &&
+    /hard-denied|not allowed|blocked|policy/i.test(result.error)
+  )
+}
+
+async function ratelimitDisabled(t) {
+  const command = await rawCommand(['EVAL', 'return 1', 0])
+
+  if (command.status === 200) {
+    return false
+  }
+
+  if (policy(command)) {
+    t.skip('Bridge is running without Upstash ratelimit compatibility')
+    return true
+  }
+
+  assert.fail(`Unexpected EVAL probe failure: ${JSON.stringify(command.body)}`)
+}
+
+async function scriptFlushDisabled(t) {
+  const command = await rawCommand(['SCRIPT', 'FLUSH'])
+
+  if (command.status === 200) {
+    return false
+  }
+
+  if (policy(command)) {
+    t.skip('Bridge is running without SCRIPT FLUSH compatibility')
+    return true
+  }
+
+  assert.fail(`Unexpected SCRIPT FLUSH failure: ${JSON.stringify(command.body)}`)
 }
 
 test('Single string commands work through @upstash/redis', async () => {
@@ -233,10 +272,11 @@ test('Unauthorized requests are rejected', async () => {
 })
 
 test('Dangerous commands are rejected before Redis execution', async () => {
-  const result = await rawCommand(['EVAL', 'return 1', '0'])
+  const result = await rawCommand(['FCALL', 'some_function', 0])
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
+  assert.match(result.error, /hard-denied|not allowed/i)
 })
 
 test('Connection-state commands are rejected before Redis execution', async () => {
@@ -244,4 +284,61 @@ test('Connection-state commands are rejected before Redis execution', async () =
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
+})
+
+test('Upstash ratelimit fixed window works through the bridge', async (t) => {
+  if (await ratelimitDisabled(t)) {
+    return
+  }
+
+  const prefix = `sdk:ratelimit:${Date.now()}:fixed`
+  const identifier = 'user-1'
+
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(2, '10 s'),
+    prefix,
+    analytics: false,
+  })
+
+  const first = await limiter.limit(identifier)
+  assert.equal(first.success, true)
+  assert.equal(first.limit, 2)
+  assert.equal(first.remaining, 1)
+
+  const second = await limiter.limit(identifier)
+  assert.equal(second.success, true)
+  assert.equal(second.limit, 2)
+  assert.equal(second.remaining, 0)
+
+  const third = await limiter.limit(identifier)
+  assert.equal(third.success, false)
+  assert.equal(third.limit, 2)
+  assert.equal(third.remaining, 0)
+})
+
+test('Upstash ratelimit EVALSHA fallback to EVAL works after SCRIPT FLUSH', async (t) => {
+  if (await scriptFlushDisabled(t)) {
+    return
+  }
+
+  const prefix = `sdk:ratelimit:${Date.now()}:fallback`
+  const identifier = 'user-1'
+
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(1, '10 s'),
+    prefix,
+    analytics: false,
+  })
+
+  const first = await limiter.limit(identifier)
+  assert.equal(first.success, true)
+  assert.equal(first.limit, 1)
+  assert.equal(first.remaining, 0)
+
+  const second = await limiter.limit(identifier)
+  assert.equal(second.success, false)
+  assert.equal(second.limit, 1)
+  assert.equal(second.remaining, 0)
 })

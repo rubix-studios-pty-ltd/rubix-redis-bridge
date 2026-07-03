@@ -11,6 +11,7 @@ pub struct SecurityPolicy {
     pub max_pipeline_commands: usize,
     pub max_command_args: usize,
     pub max_arg_bytes: usize,
+    pub upstash_ratelimit: bool,
 }
 
 #[derive(Clone)]
@@ -28,6 +29,7 @@ impl fmt::Debug for SecurityPolicy {
             .field("max_pipeline_commands", &self.max_pipeline_commands)
             .field("max_command_args", &self.max_command_args)
             .field("max_arg_bytes", &self.max_arg_bytes)
+            .field("upstash_ratelimit", &self.upstash_ratelimit)
             .finish()
     }
 }
@@ -51,7 +53,7 @@ impl SecurityPolicy {
         let hard_denied_allowed = self
             .allowed_commands
             .iter()
-            .filter(|command| is_hard_denied_command(command))
+            .filter(|command| is_hard_denied_command(command, self.upstash_ratelimit))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -122,7 +124,11 @@ impl SecurityPolicy {
             bail!("Invalid command array. Command cannot be empty.");
         }
 
-        reject_hard_denied_command(&command_name)?;
+        if command_name == "SCRIPT" && self.upstash_ratelimit {
+            validate_allowed_script_subcommand(array)?;
+        } else {
+            reject_hard_denied_command(&command_name, self.upstash_ratelimit)?;
+        }
 
         if self.allowed_commands.is_empty() {
             bail!("No Redis commands are allowed by policy.");
@@ -148,20 +154,28 @@ impl SecurityPolicy {
     }
 }
 
-fn reject_hard_denied_command(command_name: &str) -> anyhow::Result<()> {
-    if is_hard_denied_command(command_name) {
+fn reject_hard_denied_command(command_name: &str, upstash_ratelimit: bool) -> anyhow::Result<()> {
+    if is_hard_denied_command(command_name, upstash_ratelimit) {
         bail!("Redis command is hard-denied by bridge policy: {command_name}");
     }
 
     Ok(())
 }
 
-fn is_hard_denied_command(command_name: &str) -> bool {
+fn is_hard_denied_command(command_name: &str, upstash_ratelimit: bool) -> bool {
+    if upstash_ratelimit && matches!(command_name, "EVAL" | "EVALSHA" | "SCRIPT") {
+        return false;
+    }
+
     matches!(
         command_name,
-        // Redis Functions and script management. EVAL/EVALSHA are controlled by the normal
-        // allowlist and optional Lua gates, but SCRIPT/FUNCTION/FCALL remain hard-denied.
-        "FCALL"
+        // EVAL/EVALSHA/SCRIPT can be enabled only by the Upstash Ratelimit compatibility profile
+        // and the normal command allowlist.
+        "EVAL"
+            | "EVAL_RO"
+            | "EVALSHA"
+            | "EVALSHA_RO"
+            | "FCALL"
             | "FCALL_RO"
             | "FUNCTION"
             | "SCRIPT"
@@ -240,6 +254,53 @@ fn is_hard_denied_command(command_name: &str) -> bool {
     )
 }
 
+fn validate_allowed_script_subcommand(array: &[Value]) -> anyhow::Result<()> {
+    let subcommand = array
+        .get(1)
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_ascii_uppercase())
+        .ok_or_else(|| anyhow!("SCRIPT requires a subcommand."))?;
+
+    match subcommand.as_str() {
+        "LOAD" => {
+            if array.len() != 3 {
+                bail!("SCRIPT LOAD requires exactly one script argument.");
+            }
+
+            Ok(())
+        }
+        "EXISTS" => {
+            if array.len() < 3 {
+                bail!("SCRIPT EXISTS requires at least one SHA argument.");
+            }
+
+            Ok(())
+        }
+        "FLUSH" => {
+            if array.len() > 3 {
+                bail!("SCRIPT FLUSH accepts at most one optional mode argument.");
+            }
+
+            if let Some(mode) = array.get(2) {
+                let mode = mode
+                    .as_str()
+                    .map(|value| value.trim().to_ascii_uppercase())
+                    .ok_or_else(|| anyhow!("SCRIPT FLUSH mode must be a string."))?;
+
+                if !matches!(mode.as_str(), "SYNC" | "ASYNC") {
+                    bail!("SCRIPT FLUSH mode must be SYNC or ASYNC.");
+                }
+            }
+
+            Ok(())
+        }
+        "KILL" | "DEBUG" => {
+            bail!("SCRIPT {subcommand} is blocked by bridge policy.")
+        }
+        _ => bail!("SCRIPT subcommand is not allowed by bridge policy: {subcommand}"),
+    }
+}
+
 fn json_value_to_arg(value: &Value, max_arg_bytes: usize) -> anyhow::Result<Vec<u8>> {
     let bytes = match value {
         Value::String(value) => value.as_bytes().to_vec(),
@@ -272,23 +333,12 @@ mod tests {
             max_pipeline_commands: 10,
             max_command_args: 4,
             max_arg_bytes: 16,
+            upstash_ratelimit: false,
         }
     }
 
     #[test]
-    fn denies_script_management_even_when_allowed() {
-        let mut policy = policy();
-        policy.allowed_commands.insert("SCRIPT".to_string());
-
-        let err = policy
-            .parse_single_command(&serde_json::json!(["SCRIPT", "LOAD", "return 1"]))
-            .unwrap_err();
-
-        assert!(err.to_string().contains("hard-denied"));
-    }
-
-    #[test]
-    fn denies_shared_connection_state_commands() {
+    fn denies_shared_connection_commands() {
         let mut policy = policy();
         policy.allowed_commands.extend(
             [
@@ -352,12 +402,64 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_hard_denied_allowed_commands() {
+    fn validate_rejects_hard_denied_commands() {
         let mut policy = policy();
         policy.allowed_commands.insert("FCALL".to_string());
 
         let err = policy.validate().unwrap_err();
 
         assert!(err.to_string().contains("hard-denied"));
+    }
+
+    #[test]
+    fn allows_script_flush_ratelimit_enabled() {
+        let mut policy = policy();
+        policy.upstash_ratelimit = true;
+        policy.allowed_commands.insert("SCRIPT".to_string());
+
+        let command = policy
+            .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH"]))
+            .unwrap();
+
+        assert_eq!(command.name, "SCRIPT");
+    }
+
+    #[test]
+    fn allows_script_flush_sync_ratelimit_enabled() {
+        let mut policy = policy();
+        policy.upstash_ratelimit = true;
+        policy.allowed_commands.insert("SCRIPT".to_string());
+
+        let command = policy
+            .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH", "SYNC"]))
+            .unwrap();
+
+        assert_eq!(command.name, "SCRIPT");
+    }
+
+    #[test]
+    fn rejects_script_flush_invalid_ratelimit_enabled() {
+        let mut policy = policy();
+        policy.upstash_ratelimit = true;
+        policy.allowed_commands.insert("SCRIPT".to_string());
+
+        let err = policy
+            .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH", "BAD"]))
+            .unwrap_err();
+
+        assert!(err.to_string().contains("SYNC or ASYNC"));
+    }
+
+    #[test]
+    fn rejects_script_kill_ratelimit_enabled() {
+        let mut policy = policy();
+        policy.upstash_ratelimit = true;
+        policy.allowed_commands.insert("SCRIPT".to_string());
+
+        let err = policy
+            .parse_single_command(&serde_json::json!(["SCRIPT", "KILL"]))
+            .unwrap_err();
+
+        assert!(err.to_string().contains("blocked by bridge policy"));
     }
 }

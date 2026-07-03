@@ -21,6 +21,8 @@ GET  /healthz
 GET  /readyz
 ```
 
+`GET /metrics` is protected separately by `RRB_METRICS_TOKEN`.
+
 Authentication uses bearer tokens:
 
 ```txt
@@ -81,6 +83,44 @@ RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL
 ```
 
 With that allowlist, SDK methods using commands outside that set will fail by design.
+
+## Upstash Ratelimit
+
+`@upstash/ratelimit` uses Redis Lua scripting.
+
+The normal flow is:
+
+```txt
+EVALSHA
+fallback to EVAL when Redis returns NOSCRIPT
+```
+
+Rubix Redis Bridge supports this through an explicit compatibility flag:
+
+```bash
+RRB_UPSTASH_RATELIMIT=true
+```
+
+When this flag is enabled, the bridge adjusts the command policy for the Lua flow required by `@upstash/ratelimit`.
+
+The compatibility mode allows these commands through policy:
+
+```txt
+EVAL
+EVALSHA
+SCRIPT
+```
+
+This is required because `@upstash/ratelimit` may call `EVALSHA` first, then fall back to `EVAL` when Redis does not already have the script cached.
+
+Enable this only for trusted applications and private deployments. Lua scripting gives the caller more power than simple Redis data commands.
+
+Example production allowlist for Upstash Redis and Upstash Ratelimit compatibility:
+
+```bash
+RRB_UPSTASH_RATELIMIT=true
+RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVAL,EVALSHA,SCRIPT
+```
 
 ## Security
 
@@ -143,7 +183,7 @@ The following commands are blocked inside the bridge regardless of allowlist or 
 Scripting and Redis Functions are hard-denied because they can execute nested Redis commands internally and bypass an outer command allowlist:
 
 ```txt
-FCALL, FCALL_RO, FUNCTION, SCRIPT
+EVAL_RO, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
 Multiplexed administrative command families are hard-denied as whole families because safe and dangerous operations share the same top-level command name:
@@ -181,7 +221,7 @@ For public or semi-public deployments, set `RRB_ALLOWED_COMMANDS` yourself and o
 Example narrow allowlist:
 
 ```bash
-RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVALSHA,EVAL
+RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVALSHA,EVAL,SCRIPT
 ```
 
 ## Health and readiness
@@ -204,7 +244,27 @@ Prometheus metrics are exposed at:
 GET /metrics
 ```
 
-The endpoint returns process and Redis bridge counters in Prometheus text format.
+The metrics endpoint is protected by a separate bearer token:
+
+```bash
+RRB_METRICS_TOKEN=replace-with-strong-metrics-token
+```
+
+Metrics requests must include:
+
+```txt
+Authorization: Bearer <metrics-token>
+```
+
+`RRB_METRICS_TOKEN` is separate from `RRB_TOKEN`.
+
+Use `RRB_TOKEN` for Redis API requests.
+
+Use `RRB_METRICS_TOKEN` for Prometheus or compatible metrics scrapers.
+
+This allows metrics access without exposing the Redis command token.
+
+If `RRB_METRICS_TOKEN` is not configured, `/metrics` returns an authentication error.
 
 Useful metrics include:
 
@@ -214,6 +274,40 @@ Useful metrics include:
 - rrb_redis_operation_duration_seconds
 - rrb_inflight_redis_operations
 - rrb_configured_targets
+
+Metric purpose:
+
+| Metric | Purpose |
+| --- | --- |
+| `rrb_auth_failed_total` | Counts failed bearer-token authentication attempts |
+| `rrb_command_denied_total` | Counts commands rejected by bridge policy before Redis execution |
+| `rrb_redis_operations_total` | Counts Redis operations by target, operation type, and result |
+| `rrb_redis_operation_duration_seconds` | Tracks Redis operation latency |
+| `rrb_inflight_redis_operations` | Shows current in-flight Redis operations |
+| `rrb_configured_targets` | Shows how many Redis targets were loaded at startup |
+
+Metrics are labelled with bridge target ids and operation types.
+
+Prometheus scrape example:
+
+```yaml
+scrape_configs:
+  - job_name: rubix-redis-bridge
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - serverless-redis:8080
+    authorization:
+      type: Bearer
+      credentials: your-metrics-token
+```
+
+Manual metrics test:
+
+```bash
+curl -sS http://127.0.0.1:7777/metrics \
+  -H "Authorization: Bearer $RRB_METRICS_TOKEN"
+```
 
 ## Runtime limits
 
@@ -275,20 +369,22 @@ Supported environment variables:
 | `RRB_HOST` | `0.0.0.0` | Bind host |
 | `RRB_PORT` | `8080` | Bind port |
 | `RRB_MODE` | `file` | `env` or `file` |
-| `RRB_TOKEN` | none | HTTP bearer token in env mode |
-| `RRB_CONNECTION_STRING` | none | Redis URL in env mode |
-| `RRB_METRICS_TOKEN` | none | Bearer token required to access /metrics |
+| `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
+| `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
+| `RRB_UPSTASH_RATELIMIT` | `false` | Enables command policy compatibility for the `@upstash/ratelimit` Lua flow |
+| `REDIS_URL` | none | Fallback Redis URL in `env` mode when `RRB_CONNECTION_STRING` is not set |
+| `RRB_CONNECTION_STRING` | none | Redis URL in `env` mode |
 | `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
-| `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | Multi-token file config |
-| `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternative file config path |
-| `RRB_ALLOWED_COMMANDS` | conservative data-command default | Command allowlist. Empty value fails startup. |
+| `RRB_ALLOWED_COMMANDS` | conservative data-command default | Command allowlist. Empty value fails startup |
 | `RRB_BLOCKED_COMMANDS` | secure defaults plus custom entries | Additional blocked commands |
-| `RRB_MAX_BODY_BYTES` | `1048576` | Request body limit |
+| `RRB_MAX_BODY_BYTES` | `1048576` | Request body limit in bytes |
 | `RRB_MAX_CONCURRENCY` | `1024` | HTTP API concurrency limit |
-| `RRB_MAX_PIPELINE_COMMANDS` | `1000` | Pipeline command count limit |
+| `RRB_MAX_PIPELINE_COMMANDS` | `1000` | Pipeline and transaction command count limit |
 | `RRB_MAX_COMMAND_ARGS` | `256` | Per-command argument count limit |
 | `RRB_MAX_ARG_BYTES` | `262144` | Per-argument byte limit |
 | `RRB_REQUEST_TIMEOUT_MS` | `5000` | Timeout for Redis connection acquisition and command execution |
+| `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | Multi-token file config path |
+| `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternative file config path |
 
 ## File mode
 

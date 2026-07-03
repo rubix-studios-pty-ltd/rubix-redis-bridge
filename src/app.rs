@@ -395,7 +395,7 @@ async fn execute_pipeline(
                             "result": encode_redis_value(value, base64_encoding)
                         }),
                         Err(error) => json!({
-                            "error": clean_redis_error(error.to_string())
+                            "error": redis_error_message(&error)
                         }),
                     })
                     .collect()
@@ -609,7 +609,7 @@ fn redis_error_to_api_error(error: redis::RedisError) -> ApiError {
         return ApiError::service_unavailable("Redis backend unavailable");
     }
 
-    ApiError::bad_request(clean_redis_error(error.to_string()))
+    ApiError::bad_request(redis_error_message(&error))
 }
 
 fn is_backend_unavailable_error(error: &redis::RedisError) -> bool {
@@ -639,6 +639,24 @@ fn clean_redis_error(message: String) -> String {
         .strip_prefix("ResponseError: ")
         .unwrap_or(message.as_str())
         .to_string()
+}
+
+fn redis_error_message(error: &redis::RedisError) -> String {
+    if let Some(code) = error.code() {
+        let message = clean_redis_error(error.to_string());
+
+        if message.starts_with(code) {
+            return message;
+        }
+
+        if let Some((_, detail)) = message.split_once(": ") {
+            return format!("{code} {detail}");
+        }
+
+        return format!("{code} {message}");
+    }
+
+    clean_redis_error(error.to_string())
 }
 
 fn json_response(status: StatusCode, value: Value) -> Response {

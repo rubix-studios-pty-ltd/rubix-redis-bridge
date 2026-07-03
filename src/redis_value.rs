@@ -79,7 +79,7 @@ fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> 
         let encoded_key = encode_redis_value(key, base64_encoding);
         let encoded_value = encode_redis_value(value, base64_encoding);
 
-        if let Some(object_key) = json_value_to_object_key(&encoded_key) {
+        if let Some(object_key) = json_to_object(&encoded_key) {
             if object.insert(object_key, encoded_value.clone()).is_some() {
                 can_encode_as_object = false;
             }
@@ -100,7 +100,7 @@ fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> 
     }
 }
 
-fn json_value_to_object_key(value: &Value) -> Option<String> {
+fn json_to_object(value: &Value) -> Option<String> {
     match value {
         Value::String(value) => Some(value.clone()),
         Value::Number(value) => Some(value.to_string()),
