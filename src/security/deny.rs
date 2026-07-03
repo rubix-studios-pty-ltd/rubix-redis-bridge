@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 use anyhow::bail;
 
-use super::commands::{DENIED_COMMANDS, RATELIMIT_COMMANDS};
+use crate::commands::{DENIED_COMMANDS, RATELIMIT_COMMANDS};
 
 pub(crate) fn reject_command(command_name: &str, upstash_ratelimit: bool) -> anyhow::Result<()> {
     if is_denied_command(command_name, upstash_ratelimit) {
