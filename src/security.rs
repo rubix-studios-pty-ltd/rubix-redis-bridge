@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn denies_shared_connection_state_commands() {
+    fn denies_shared_connection_commands() {
         let mut policy = policy();
         policy.allowed_commands.extend(
             [
@@ -410,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_hard_denied_allowed_commands() {
+    fn validate_rejects_hard_denied_commands() {
         let mut policy = policy();
         policy.allowed_commands.insert("FCALL".to_string());
 
@@ -420,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn allows_script_flush_when_upstash_ratelimit_compat_is_enabled() {
+    fn allows_script_flush_ratelimit_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn allows_script_flush_with_sync_mode_when_upstash_ratelimit_compat_is_enabled() {
+    fn allows_script_flush_sync_ratelimit_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_script_flush_with_invalid_mode() {
+    fn rejects_script_flush_invalid_ratelimit_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
@@ -459,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn still_rejects_script_kill_ratelimit_enabled() {
+    fn rejects_script_kill_ratelimit_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
