@@ -424,50 +424,50 @@ mod tests {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
-    
+
         let command = policy
             .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH"]))
             .unwrap();
-    
+
         assert_eq!(command.name, "SCRIPT");
     }
-    
+
     #[test]
     fn allows_script_flush_with_sync_mode_when_upstash_ratelimit_compat_is_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
-    
+
         let command = policy
             .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH", "SYNC"]))
             .unwrap();
-    
+
         assert_eq!(command.name, "SCRIPT");
     }
-    
+
     #[test]
     fn rejects_script_flush_with_invalid_mode() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
-    
+
         let err = policy
             .parse_single_command(&serde_json::json!(["SCRIPT", "FLUSH", "BAD"]))
             .unwrap_err();
-    
+
         assert!(err.to_string().contains("SYNC or ASYNC"));
     }
-    
+
     #[test]
     fn still_rejects_script_kill_ratelimit_enabled() {
         let mut policy = policy();
         policy.compat_upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
-    
+
         let err = policy
             .parse_single_command(&serde_json::json!(["SCRIPT", "KILL"]))
             .unwrap_err();
-    
+
         assert!(err.to_string().contains("blocked by bridge policy"));
     }
 }
