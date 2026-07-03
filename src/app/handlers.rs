@@ -75,7 +75,7 @@ pub async fn command(
     let command = match state.security().parse_command(&value) {
         Ok(command) => command,
         Err(error) => {
-            state.metrics().inc_command_denied(target.id(), "single");
+            state.metrics().command_denied(target.id(), "single");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -113,7 +113,7 @@ pub async fn pipeline(
     let commands = match state.security().parse_command_list(&value) {
         Ok(commands) => commands,
         Err(error) => {
-            state.metrics().inc_command_denied(target.id(), "pipeline");
+            state.metrics().command_denied(target.id(), "pipeline");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -151,9 +151,7 @@ pub async fn multi_exec(
     let commands = match state.security().parse_command_list(&value) {
         Ok(commands) => commands,
         Err(error) => {
-            state
-                .metrics()
-                .inc_command_denied(target.id(), "multi_exec");
+            state.metrics().command_denied(target.id(), "multi_exec");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };

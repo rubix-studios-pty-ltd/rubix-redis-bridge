@@ -8,7 +8,7 @@ use super::state::{AppState, RedisTarget};
 
 impl AppState {
     pub(crate) fn unauthorized(&self, message: impl Into<String>) -> ApiError {
-        self.metrics.inc_auth_failed();
+        self.metrics.auth_failed();
         ApiError::unauthorized(message)
     }
 
