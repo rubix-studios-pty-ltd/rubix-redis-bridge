@@ -9,7 +9,7 @@ pub fn encode_value(value: RedisValue, base64_encoding: bool) -> Value {
         RedisValue::Int(value) => json!(value),
         RedisValue::BulkString(value) => encode_bytes(value, base64_encoding),
         RedisValue::Array(values) => encode_array(values, base64_encoding),
-        RedisValue::SimpleString(value) => encode_simple_string(value, base64_encoding),
+        RedisValue::SimpleString(value) => encode_string(value, base64_encoding),
         RedisValue::Okay => json!("OK"),
 
         RedisValue::Map(entries) => encode_map(entries, base64_encoding),
@@ -49,9 +49,7 @@ pub fn encode_value(value: RedisValue, base64_encoding: bool) -> Value {
             "error": error.to_string(),
         }),
 
-        other => {
-            let _ = other;
-
+        _ => {
             warn!("unsupported RedisValue variant encountered");
 
             json!({
@@ -73,24 +71,24 @@ fn encode_array(values: Vec<RedisValue>, base64_encoding: bool) -> Value {
 fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> Value {
     let mut object = Map::new();
     let mut pairs = Vec::with_capacity(entries.len());
-    let mut can_encode_as_object = true;
+    let mut encode_object = true;
 
     for (key, value) in entries {
         let encoded_key = encode_value(key, base64_encoding);
         let encoded_value = encode_value(value, base64_encoding);
 
-        if let Some(object_key) = json_to_object(&encoded_key) {
+        if let Some(object_key) = encode_object_key(&encoded_key) {
             if object.insert(object_key, encoded_value.clone()).is_some() {
-                can_encode_as_object = false;
+                encode_object = false;
             }
         } else {
-            can_encode_as_object = false;
+            encode_object = false;
         }
 
         pairs.push(Value::Array(vec![encoded_key, encoded_value]));
     }
 
-    if can_encode_as_object {
+    if encode_object {
         Value::Object(object)
     } else {
         json!({
@@ -100,7 +98,7 @@ fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> 
     }
 }
 
-fn json_to_object(value: &Value) -> Option<String> {
+fn encode_object_key(value: &Value) -> Option<String> {
     match value {
         Value::String(value) => Some(value.clone()),
         Value::Number(value) => Some(value.to_string()),
@@ -120,7 +118,7 @@ fn encode_f64(value: f64) -> Value {
     }
 }
 
-fn encode_big_number<T: ToString>(value: T) -> Value {
+fn encode_big_number(value: impl ToString) -> Value {
     json!(value.to_string())
 }
 
@@ -143,7 +141,7 @@ fn encode_bytes(bytes: Vec<u8>, base64_encoding: bool) -> Value {
     }
 }
 
-fn encode_simple_string(value: String, base64_encoding: bool) -> Value {
+fn encode_string(value: String, base64_encoding: bool) -> Value {
     if base64_encoding && value != "OK" {
         return json!(base64::engine::general_purpose::STANDARD.encode(value.as_bytes()));
     }
