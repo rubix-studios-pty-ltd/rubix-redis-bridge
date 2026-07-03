@@ -11,7 +11,7 @@ pub struct SecurityPolicy {
     pub max_pipeline_commands: usize,
     pub max_command_args: usize,
     pub max_arg_bytes: usize,
-    pub compat_upstash_ratelimit: bool,
+    pub upstash_ratelimit: bool,
 }
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ impl fmt::Debug for SecurityPolicy {
             .field("max_pipeline_commands", &self.max_pipeline_commands)
             .field("max_command_args", &self.max_command_args)
             .field("max_arg_bytes", &self.max_arg_bytes)
-            .field("compat_upstash_ratelimit", &self.compat_upstash_ratelimit)
+            .field("upstash_ratelimit", &self.upstash_ratelimit)
             .finish()
     }
 }
@@ -53,7 +53,7 @@ impl SecurityPolicy {
         let hard_denied_allowed = self
             .allowed_commands
             .iter()
-            .filter(|command| is_hard_denied_command(command, self.compat_upstash_ratelimit))
+            .filter(|command| is_hard_denied_command(command, self.upstash_ratelimit))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -124,10 +124,10 @@ impl SecurityPolicy {
             bail!("Invalid command array. Command cannot be empty.");
         }
 
-        if command_name == "SCRIPT" && self.compat_upstash_ratelimit {
+        if command_name == "SCRIPT" && self.upstash_ratelimit {
             validate_allowed_script_subcommand(array)?;
         } else {
-            reject_hard_denied_command(&command_name, self.compat_upstash_ratelimit)?;
+            reject_hard_denied_command(&command_name, self.upstash_ratelimit)?;
         }
 
         if self.allowed_commands.is_empty() {
@@ -154,24 +154,16 @@ impl SecurityPolicy {
     }
 }
 
-fn reject_hard_denied_command(
-    command_name: &str,
-    compat_upstash_ratelimit: bool,
-) -> anyhow::Result<()> {
-    if is_hard_denied_command(command_name, compat_upstash_ratelimit) {
+fn reject_hard_denied_command(command_name: &str, upstash_ratelimit: bool) -> anyhow::Result<()> {
+    if is_hard_denied_command(command_name, upstash_ratelimit) {
         bail!("Redis command is hard-denied by bridge policy: {command_name}");
     }
 
     Ok(())
 }
 
-fn is_hard_denied_command(command_name: &str, compat_upstash_ratelimit: bool) -> bool {
-    if compat_upstash_ratelimit
-        && matches!(
-            command_name,
-            "EVAL" | "EVAL_RO" | "EVALSHA" | "EVALSHA_RO" | "SCRIPT"
-        )
-    {
+fn is_hard_denied_command(command_name: &str, upstash_ratelimit: bool) -> bool {
+    if upstash_ratelimit && matches!(command_name, "EVAL" | "EVALSHA" | "SCRIPT") {
         return false;
     }
 
@@ -341,7 +333,7 @@ mod tests {
             max_pipeline_commands: 10,
             max_command_args: 4,
             max_arg_bytes: 16,
-            compat_upstash_ratelimit: false,
+            upstash_ratelimit: false,
         }
     }
 
@@ -422,7 +414,7 @@ mod tests {
     #[test]
     fn allows_script_flush_ratelimit_enabled() {
         let mut policy = policy();
-        policy.compat_upstash_ratelimit = true;
+        policy.upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
 
         let command = policy
@@ -435,7 +427,7 @@ mod tests {
     #[test]
     fn allows_script_flush_sync_ratelimit_enabled() {
         let mut policy = policy();
-        policy.compat_upstash_ratelimit = true;
+        policy.upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
 
         let command = policy
@@ -448,7 +440,7 @@ mod tests {
     #[test]
     fn rejects_script_flush_invalid_ratelimit_enabled() {
         let mut policy = policy();
-        policy.compat_upstash_ratelimit = true;
+        policy.upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
 
         let err = policy
@@ -461,7 +453,7 @@ mod tests {
     #[test]
     fn rejects_script_kill_ratelimit_enabled() {
         let mut policy = policy();
-        policy.compat_upstash_ratelimit = true;
+        policy.upstash_ratelimit = true;
         policy.allowed_commands.insert("SCRIPT".to_string());
 
         let err = policy

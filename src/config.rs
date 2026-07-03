@@ -82,18 +82,12 @@ impl BridgeConfig {
             blocked_commands.extend(extra_blocked_commands);
         }
 
-        let compat_upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
+        let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
 
-        if compat_upstash_ratelimit {
-            allowed_commands.extend(
-                ["EVAL", "EVAL_RO", "EVALSHA", "EVALSHA_RO", "SCRIPT"]
-                    .into_iter()
-                    .map(String::from),
-            );
+        if upstash_ratelimit {
+            allowed_commands.extend(["EVAL", "EVALSHA", "SCRIPT"].into_iter().map(String::from));
             blocked_commands.remove("EVAL");
-            blocked_commands.remove("EVAL_RO");
             blocked_commands.remove("EVALSHA");
-            blocked_commands.remove("EVALSHA_RO");
             blocked_commands.remove("SCRIPT");
         }
 
@@ -103,7 +97,7 @@ impl BridgeConfig {
             max_pipeline_commands,
             max_command_args,
             max_arg_bytes,
-            compat_upstash_ratelimit,
+            upstash_ratelimit,
         };
 
         security.validate()?;

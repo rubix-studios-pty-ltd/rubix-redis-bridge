@@ -107,9 +107,7 @@ The compatibility mode allows these commands through policy:
 
 ```txt
 EVAL
-EVAL_RO
 EVALSHA
-EVALSHA_RO
 SCRIPT
 ```
 
@@ -121,7 +119,7 @@ Example production allowlist for Upstash Redis and Upstash Ratelimit compatibili
 
 ```bash
 RRB_UPSTASH_RATELIMIT=true
-RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVAL,EVAL_RO,EVALSHA,EVALSHA_RO,SCRIPT
+RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVAL,EVALSHA,SCRIPT
 ```
 
 ## Security
@@ -185,7 +183,7 @@ The following commands are blocked inside the bridge regardless of allowlist or 
 Scripting and Redis Functions are hard-denied because they can execute nested Redis commands internally and bypass an outer command allowlist:
 
 ```txt
-FCALL, FCALL_RO, FUNCTION, SCRIPT
+EVAL_RO, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
 Multiplexed administrative command families are hard-denied as whole families because safe and dangerous operations share the same top-level command name:
@@ -223,7 +221,7 @@ For public or semi-public deployments, set `RRB_ALLOWED_COMMANDS` yourself and o
 Example narrow allowlist:
 
 ```bash
-RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVALSHA,EVAL
+RRB_ALLOWED_COMMANDS=PING,GET,SET,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,EVALSHA,EVAL,SCRIPT
 ```
 
 ## Health and readiness
