@@ -74,7 +74,7 @@ fn reject_connection_commands() {
         .allowed_commands
         .extend(CONNECTION_COMMANDS.iter().copied().map(String::from));
 
-    for command in CONNECTION_COMMANDS.iter().copied() {
+    for &command in CONNECTION_COMMANDS {
         error_contains(&policy, json!([command]), "hard-denied");
     }
 }
