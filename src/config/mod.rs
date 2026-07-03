@@ -75,6 +75,7 @@ impl BridgeConfig {
         let max_command_args = parse_env_or_default("RRB_MAX_COMMAND_ARGS", 256)?;
         let max_arg_bytes = parse_env_or_default("RRB_MAX_ARG_BYTES", 256 * 1024)?;
         let request_timeout_ms: u64 = parse_env_or_default("RRB_REQUEST_TIMEOUT_MS", 5_000)?;
+        let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
 
         let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
@@ -85,8 +86,6 @@ impl BridgeConfig {
         if let Some(extra_blocked_commands) = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])? {
             blocked_commands.extend(extra_blocked_commands);
         }
-
-        let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
 
         if upstash_ratelimit {
             for &command in RATELIMIT_COMMANDS {
