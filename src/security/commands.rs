@@ -1,11 +1,4 @@
-pub(crate) const CONNECTION_COMMANDS: &[&str] = &[
-    "SELECT",
-    "HELLO",
-    "RESET",
-    "ASKING",
-    "READONLY",
-    "READWRITE",
-];
+// TODO: move command constant to root shared with config.
 
 pub(crate) const DENIED_COMMANDS: &[&str] = &[
     "EVAL",
