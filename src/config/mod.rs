@@ -80,8 +80,7 @@ impl BridgeConfig {
         let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
 
-        let mut blocked_commands = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])?
-            .unwrap_or_else(|| parse_command_list(DENIED_COMMANDS));
+        let mut blocked_commands = parse_command_list(DENIED_COMMANDS);
 
         if let Some(extra_blocked_commands) = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])? {
             blocked_commands.extend(extra_blocked_commands);
