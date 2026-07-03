@@ -19,6 +19,7 @@ POST /pipeline
 POST /multi-exec
 GET  /healthz
 GET  /readyz
+GET  /metrics
 ```
 
 `GET /metrics` is protected separately by `RRB_METRICS_TOKEN`.
