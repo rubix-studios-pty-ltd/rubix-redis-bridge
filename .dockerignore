@@ -6,7 +6,6 @@
 *.log
 node_modules
 target
-tests
 
 biome.json
 package.json
