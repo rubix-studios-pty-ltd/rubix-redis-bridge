@@ -12,7 +12,7 @@ fn lockout() -> AuthLockout {
 }
 
 #[test]
-fn locks_after_failures_inside_window() {
+fn lock_failures_in_window() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -24,7 +24,7 @@ fn locks_after_failures_inside_window() {
 }
 
 #[test]
-fn resets_failures_after_window() {
+fn clear_failures_after_window() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -36,7 +36,7 @@ fn resets_failures_after_window() {
 }
 
 #[test]
-fn removes_entry_after_success() {
+fn clear_lockout_after_success() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -48,7 +48,7 @@ fn removes_entry_after_success() {
 }
 
 #[test]
-fn unlocks_after_lockout_duration() {
+fn clear_lockout_after_duration() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -61,7 +61,7 @@ fn unlocks_after_lockout_duration() {
 }
 
 #[test]
-fn stops_tracking_new_ips_when_entry_limit_is_full() {
+fn ignore_ips_lockout_full() {
     let lockout = AuthLockout::new(3, Duration::from_secs(60), Duration::from_secs(300), 1);
     let now = Instant::now();
 
@@ -84,7 +84,7 @@ fn stops_tracking_new_ips_when_entry_limit_is_full() {
 }
 
 #[test]
-fn cleanup_allows_new_ip_after_window_expiry() {
+fn allow_ips_lockout_cleanup() {
     let lockout = AuthLockout::new(3, Duration::from_secs(60), Duration::from_secs(300), 1);
     let now = Instant::now();
 
@@ -107,7 +107,7 @@ fn cleanup_allows_new_ip_after_window_expiry() {
 }
 
 #[test]
-fn disabled_lockout_never_tracks_or_locks() {
+fn skip_lockout_when_disabled() {
     let lockout = AuthLockout::new(0, Duration::from_secs(60), Duration::from_secs(300), 1024);
 
     let ip = ip("203.0.113.10");
@@ -121,7 +121,7 @@ fn disabled_lockout_never_tracks_or_locks() {
 }
 
 #[test]
-fn returns_locked_for_repeated_failures_while_locked() {
+fn keep_locked_additional_failures() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -135,7 +135,7 @@ fn returns_locked_for_repeated_failures_while_locked() {
 }
 
 #[test]
-fn boundary_failure_after_window_starts_new_window() {
+fn start_new_failure_window() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();
@@ -152,7 +152,7 @@ fn boundary_failure_after_window_starts_new_window() {
 }
 
 #[test]
-fn record_success_clears_locked_state() {
+fn clear_locked_state_on_success() {
     let lockout = lockout();
     let ip = ip("203.0.113.10");
     let now = Instant::now();

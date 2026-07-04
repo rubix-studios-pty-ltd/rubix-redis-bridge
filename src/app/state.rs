@@ -9,7 +9,7 @@ use axum::http::HeaderMap;
 use redis::aio::ConnectionManager;
 use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
-use crate::client_ip::TrustedProxies;
+use crate::client::TrustedProxies;
 use crate::config::{BridgeConfig, RedisTargetConfig};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;

@@ -1,5 +1,5 @@
 mod app;
-mod client_ip;
+mod client;
 mod commands;
 mod config;
 mod metrics;

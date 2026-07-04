@@ -5,12 +5,12 @@ use std::time::Duration;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 
-use crate::client_ip::TrustedProxies;
+use crate::app::error::ApiError;
+use crate::client::TrustedProxies;
 use crate::config::{BridgeConfig, RedisTargetConfig};
 use crate::security::SecurityPolicy;
 
 use super::AppState;
-use crate::app::error::ApiError;
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
@@ -71,7 +71,7 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
 }
 
 #[test]
-fn invalid_bridge_auth_locks_ip_after_threshold() {
+fn lock_ip_repeat_failures() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-token");
@@ -93,7 +93,7 @@ fn invalid_bridge_auth_locks_ip_after_threshold() {
 }
 
 #[test]
-fn locked_ip_cannot_authenticate_with_valid_token() {
+fn reject_token_ip_locked() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-token");
@@ -121,7 +121,7 @@ fn locked_ip_cannot_authenticate_with_valid_token() {
 }
 
 #[test]
-fn successful_bridge_auth_clears_failure_count() {
+fn clear_failures_after_success() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-token");
@@ -156,7 +156,7 @@ fn successful_bridge_auth_clears_failure_count() {
 }
 
 #[test]
-fn missing_auth_header_counts_toward_lockout() {
+fn count_missing_header_lockout() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let headers = HeaderMap::new();
@@ -178,7 +178,7 @@ fn missing_auth_header_counts_toward_lockout() {
 }
 
 #[test]
-fn invalid_metrics_auth_uses_lockout() {
+fn lock_invalid_metrics_auth() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-metrics-token");
@@ -200,7 +200,7 @@ fn invalid_metrics_auth_uses_lockout() {
 }
 
 #[test]
-fn disabled_lockout_keeps_returning_unauthorized() {
+fn lockout_returns_unauthorized() {
     let state = test_state(0);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-token");

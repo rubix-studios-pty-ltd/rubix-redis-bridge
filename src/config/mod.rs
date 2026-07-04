@@ -8,7 +8,7 @@ use std::time::Duration;
 use anyhow::bail;
 use serde::Deserialize;
 
-use crate::client_ip::TrustedProxies;
+use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
