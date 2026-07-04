@@ -27,6 +27,8 @@ pub struct BridgeConfig {
     pub max_concurrency: usize,
     pub request_timeout: Duration,
     pub metrics_token: Option<String>,
+    pub auth_lockout_failures: usize,
+    pub auth_lockout_duration: Duration,
 }
 
 #[derive(Clone, Deserialize)]
@@ -76,6 +78,8 @@ impl BridgeConfig {
         let max_arg_bytes = parse_env_or_default("RRB_MAX_ARG_BYTES", 256 * 1024)?;
         let request_timeout_ms: u64 = parse_env_or_default("RRB_REQUEST_TIMEOUT_MS", 5_000)?;
         let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
+        let auth_lockout_failures = parse_env_or_default("RRB_AUTH_LOCKOUT_FAILURES", 10)?;
+        let auth_lockout_seconds: u64 = parse_env_or_default("RRB_AUTH_LOCKOUT_SECONDS", 300)?;
 
         let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
@@ -91,6 +95,12 @@ impl BridgeConfig {
                 allowed_commands.insert(command.to_string());
                 blocked_commands.remove(command);
             }
+        }
+
+        if auth_lockout_failures > 0 && auth_lockout_seconds == 0 {
+            bail!(
+                "RRB_AUTH_LOCKOUT_SECONDS must be greater than zero when auth lockout is enabled"
+            );
         }
 
         let security = SecurityPolicy {
@@ -126,6 +136,8 @@ impl BridgeConfig {
             max_concurrency,
             request_timeout: Duration::from_millis(request_timeout_ms),
             metrics_token,
+            auth_lockout_failures,
+            auth_lockout_duration: Duration::from_secs(auth_lockout_seconds),
         })
     }
 }

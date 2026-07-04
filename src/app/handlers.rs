@@ -1,7 +1,8 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{Json, State};
+use axum::extract::{ConnectInfo, Json, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -16,7 +17,12 @@ use super::response::json_response;
 use super::state::AppState;
 
 pub async fn root() -> impl IntoResponse {
-    json_response(StatusCode::OK, json!("Rubix Redis Bridge"))
+    json_response(
+        StatusCode::OK,
+        json!({
+            "status": "ok"
+        }),
+    )
 }
 
 pub async fn healthz() -> impl IntoResponse {
@@ -37,8 +43,12 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
     )
 }
 
-pub async fn metrics(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if let Err(error) = state.metrics_auth(&headers) {
+pub async fn metrics(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(error) = state.metrics_auth(&headers, addr.ip()) {
         return error.into_response();
     }
 
@@ -58,11 +68,13 @@ pub async fn metrics(State(state): State<Arc<AppState>>, headers: HeaderMap) -> 
 
 pub async fn command(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
-    let target = match state.bridge_auth(&headers) {
+
+    let target = match state.bridge_auth(&headers, addr.ip()) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };
@@ -96,11 +108,13 @@ pub async fn command(
 
 pub async fn pipeline(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
-    let target = match state.bridge_auth(&headers) {
+
+    let target = match state.bridge_auth(&headers, addr.ip()) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };
@@ -134,11 +148,13 @@ pub async fn pipeline(
 
 pub async fn multi_exec(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
-    let target = match state.bridge_auth(&headers) {
+
+    let target = match state.bridge_auth(&headers, addr.ip()) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };

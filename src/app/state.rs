@@ -12,12 +12,15 @@ use crate::config::{BridgeConfig, RedisTargetConfig};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
+use super::lockout::AuthLockout;
+
 pub struct AppState {
     pub(crate) targets: HashMap<String, Arc<RedisTarget>>,
     pub(crate) security: SecurityPolicy,
     pub(crate) request_timeout: Duration,
     pub(crate) metrics: Metrics,
     pub(crate) metrics_token: Option<String>,
+    pub(crate) auth_lockout: AuthLockout,
 }
 
 pub(crate) struct RedisTarget {
@@ -76,6 +79,10 @@ impl AppState {
             request_timeout: config.request_timeout,
             metrics,
             metrics_token: config.metrics_token,
+            auth_lockout: AuthLockout::new(
+                config.auth_lockout_failures,
+                config.auth_lockout_duration,
+            ),
         })
     }
 
