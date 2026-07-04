@@ -96,6 +96,12 @@ impl Collectors {
 
         Ok(Self {
             auth_failed_total,
+            auth_lockouts_total,
+            auth_locked_requests_total,
+            auth_lockout_entry_limit_total,
+            auth_lockout_tracked_ips,
+            auth_lockout_locked_ips,
+            request_denied_total,
             command_denied_total,
             redis_operations_total,
             redis_operation_duration,
