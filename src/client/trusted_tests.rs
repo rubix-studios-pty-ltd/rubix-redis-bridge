@@ -52,3 +52,13 @@ fn rejects_invalid_cidr() {
     assert!(TrustedProxies::parse("192.0.2.0/33").is_err());
     assert!(TrustedProxies::parse("2001:db8::/129").is_err());
 }
+
+#[test]
+fn trusts_loopback_peer_ip() {
+    let trusted = TrustedProxies::parse("127.0.0.1,::1").unwrap();
+    let headers = HeaderMap::new();
+
+    assert_eq!(trusted.resolve(&headers, ip("127.0.0.1")), ip("127.0.0.1"));
+
+    assert_eq!(trusted.resolve(&headers, ip("::1")), ip("::1"));
+}
