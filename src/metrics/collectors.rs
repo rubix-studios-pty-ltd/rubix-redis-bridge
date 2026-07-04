@@ -4,6 +4,12 @@ use prometheus::{
 
 pub(super) struct Collectors {
     pub(super) auth_failed_total: IntCounter,
+    pub(super) auth_lockouts_total: IntCounter,
+    pub(super) auth_locked_requests_total: IntCounter,
+    pub(super) auth_lockout_entry_limit_total: IntCounter,
+    pub(super) auth_lockout_tracked_ips: IntGauge,
+    pub(super) auth_lockout_locked_ips: IntGauge,
+    pub(super) request_denied_total: IntCounterVec,
     pub(super) command_denied_total: IntCounterVec,
     pub(super) redis_operations_total: IntCounterVec,
     pub(super) redis_operation_duration: HistogramVec,
@@ -17,6 +23,39 @@ impl Collectors {
             "rrb_auth_failed_total",
             "Total failed bridge authentication attempts.",
         ))?;
+
+        let auth_lockouts_total = IntCounter::with_opts(Opts::new(
+            "rrb_auth_lockouts_total",
+            "Total client IP lockouts created after repeated failed authentication attempts.",
+        ))?;
+
+        let auth_locked_requests_total = IntCounter::with_opts(Opts::new(
+            "rrb_auth_locked_requests_total",
+            "Total requests rejected because the client IP is currently locked out.",
+        ))?;
+
+        let auth_lockout_entry_limit_total = IntCounter::with_opts(Opts::new(
+            "rrb_auth_lockout_entry_limit_total",
+            "Total failed authentication attempts not tracked because the auth lockout table was full.",
+        ))?;
+
+        let auth_lockout_tracked_ips = IntGauge::with_opts(Opts::new(
+            "rrb_auth_lockout_tracked_ips",
+            "Current number of client IPs tracked by the auth lockout table.",
+        ))?;
+
+        let auth_lockout_locked_ips = IntGauge::with_opts(Opts::new(
+            "rrb_auth_lockout_locked_ips",
+            "Current number of client IPs locked out after failed authentication attempts.",
+        ))?;
+
+        let request_denied_total = IntCounterVec::new(
+            Opts::new(
+                "rrb_request_denied_total",
+                "Total requests denied before Redis execution.",
+            ),
+            &["route", "reason"],
+        )?;
 
         let command_denied_total = IntCounterVec::new(
             Opts::new(
@@ -67,6 +106,12 @@ impl Collectors {
 
     pub(super) fn register(&self, registry: &Registry) -> anyhow::Result<()> {
         registry.register(Box::new(self.auth_failed_total.clone()))?;
+        registry.register(Box::new(self.auth_lockouts_total.clone()))?;
+        registry.register(Box::new(self.auth_locked_requests_total.clone()))?;
+        registry.register(Box::new(self.auth_lockout_entry_limit_total.clone()))?;
+        registry.register(Box::new(self.auth_lockout_tracked_ips.clone()))?;
+        registry.register(Box::new(self.auth_lockout_locked_ips.clone()))?;
+        registry.register(Box::new(self.request_denied_total.clone()))?;
         registry.register(Box::new(self.command_denied_total.clone()))?;
         registry.register(Box::new(self.redis_operations_total.clone()))?;
         registry.register(Box::new(self.redis_operation_duration.clone()))?;

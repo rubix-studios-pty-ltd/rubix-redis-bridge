@@ -38,6 +38,27 @@ impl AuthFailureState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AuthFailureResult {
+    Disabled,
+    Tracked,
+    Locked,
+    AlreadyLocked,
+    EntryLimitReached,
+}
+
+impl AuthFailureResult {
+    pub(crate) fn is_locked(self) -> bool {
+        matches!(self, Self::Locked | Self::AlreadyLocked)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AuthLockoutSnapshot {
+    pub(crate) tracked_ips: usize,
+    pub(crate) locked_ips: usize,
+}
+
 #[derive(Debug)]
 pub(crate) struct AuthLockout {
     max_failures: usize,
@@ -97,12 +118,20 @@ impl AuthLockout {
     }
 
     pub(crate) fn record_failure(&self, ip: IpAddr) -> bool {
-        self.record_failure_at(ip, Instant::now())
+        self.record_failure_result(ip).is_locked()
+    }
+
+    pub(crate) fn record_failure_result(&self, ip: IpAddr) -> AuthFailureResult {
+        self.record_failure_result_at(ip, Instant::now())
     }
 
     fn record_failure_at(&self, ip: IpAddr, now: Instant) -> bool {
+        self.record_failure_result_at(ip, now).is_locked()
+    }
+
+    fn record_failure_result_at(&self, ip: IpAddr, now: Instant) -> AuthFailureResult {
         if !self.is_enabled() {
-            return false;
+            return AuthFailureResult::Disabled;
         }
 
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
@@ -117,7 +146,7 @@ impl AuthLockout {
                     "Auth lockout entry limit reached; not tracking new failed client IP"
                 );
 
-                return false;
+                return AuthFailureResult::EntryLimitReached;
             }
         }
 
@@ -127,7 +156,7 @@ impl AuthLockout {
 
         if let Some(until) = state.locked_until {
             if until > now {
-                return true;
+                return AuthFailureResult::AlreadyLocked;
             }
 
             state.reset_window(now);
@@ -152,10 +181,10 @@ impl AuthLockout {
                 "Client IP locked out after failed authentication attempts"
             );
 
-            return true;
+            return AuthFailureResult::Locked;
         }
 
-        false
+        AuthFailureResult::Tracked
     }
 
     pub(crate) fn record_success(&self, ip: IpAddr) {
@@ -165,6 +194,33 @@ impl AuthLockout {
 
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
         entries.remove(&ip);
+    }
+
+    pub(crate) fn snapshot(&self) -> AuthLockoutSnapshot {
+        self.snapshot_at(Instant::now())
+    }
+
+    fn snapshot_at(&self, now: Instant) -> AuthLockoutSnapshot {
+        if !self.is_enabled() {
+            return AuthLockoutSnapshot {
+                tracked_ips: 0,
+                locked_ips: 0,
+            };
+        }
+
+        let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
+
+        Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
+
+        let locked_ips = entries
+            .values()
+            .filter(|state| matches!(state.locked_until, Some(until) if until > now))
+            .count();
+
+        AuthLockoutSnapshot {
+            tracked_ips: entries.len(),
+            locked_ips,
+        }
     }
 
     fn cleanup_stale_entries(

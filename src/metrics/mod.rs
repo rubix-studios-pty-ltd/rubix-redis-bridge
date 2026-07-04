@@ -13,6 +13,12 @@ pub use self::guard::Guard;
 pub struct Metrics {
     registry: Registry,
     pub auth_failed_total: IntCounter,
+    pub auth_lockouts_total: IntCounter,
+    pub auth_locked_requests_total: IntCounter,
+    pub auth_lockout_entry_limit_total: IntCounter,
+    pub auth_lockout_tracked_ips: IntGauge,
+    pub auth_lockout_locked_ips: IntGauge,
+    pub request_denied_total: IntCounterVec,
     pub command_denied_total: IntCounterVec,
     pub redis_operations_total: IntCounterVec,
     pub redis_operation_duration: HistogramVec,
@@ -30,6 +36,12 @@ impl Metrics {
         Ok(Self {
             registry,
             auth_failed_total: collectors.auth_failed_total,
+            auth_lockouts_total: collectors.auth_lockouts_total,
+            auth_locked_requests_total: collectors.auth_locked_requests_total,
+            auth_lockout_entry_limit_total: collectors.auth_lockout_entry_limit_total,
+            auth_lockout_tracked_ips: collectors.auth_lockout_tracked_ips,
+            auth_lockout_locked_ips: collectors.auth_lockout_locked_ips,
+            request_denied_total: collectors.request_denied_total,
             command_denied_total: collectors.command_denied_total,
             redis_operations_total: collectors.redis_operations_total,
             redis_operation_duration: collectors.redis_operation_duration,
@@ -77,5 +89,28 @@ impl Metrics {
 
     pub fn auth_failed(&self) {
         self.auth_failed_total.inc();
+    }
+
+    pub fn lockout_created(&self) {
+        self.auth_lockouts_total.inc();
+    }
+
+    pub fn locked_request(&self) {
+        self.auth_locked_requests_total.inc();
+    }
+
+    pub fn lockout_entry_limit(&self) {
+        self.auth_lockout_entry_limit_total.inc();
+    }
+
+    pub fn set_lockout_state(&self, tracked_ips: usize, locked_ips: usize) {
+        self.auth_lockout_tracked_ips.set(tracked_ips as i64);
+        self.auth_lockout_locked_ips.set(locked_ips as i64);
+    }
+
+    pub fn request_denied(&self, route: &str, reason: &str) {
+        self.request_denied_total
+            .with_label_values(&[route, reason])
+            .inc();
     }
 }

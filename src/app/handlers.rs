@@ -51,8 +51,11 @@ pub async fn metrics(
     let client_ip = state.client_ip(&headers, addr);
 
     if let Err(error) = state.metrics_auth(&headers, client_ip) {
+        state.metrics().request_denied("metrics", "auth");
         return error.into_response();
     }
+
+    state.refresh_lockout_metrics();
 
     match state.metrics().render() {
         Ok(body) => (
@@ -79,18 +82,25 @@ pub async fn command(
 
     let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
-        Err(error) => return error.into_response(),
+        Err(error) => {
+            state.metrics().request_denied("command", "auth");
+            return error.into_response();
+        }
     };
 
     let Json(value) = match body {
         Ok(body) => body,
-        Err(_) => return ApiError::bad_request("Invalid JSON body").into_response(),
+        Err(_) => {
+            state.metrics().request_denied("command", "invalid_json");
+            return ApiError::bad_request("Invalid JSON body").into_response();
+        }
     };
 
     let command = match state.security().parse_command(&value) {
         Ok(command) => command,
         Err(error) => {
             state.metrics().command_denied(target.id(), "single");
+            state.metrics().request_denied("command", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -120,18 +130,25 @@ pub async fn pipeline(
 
     let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
-        Err(error) => return error.into_response(),
+        Err(error) => {
+            state.metrics().request_denied("pipeline", "auth");
+            return error.into_response();
+        }
     };
 
     let Json(value) = match body {
         Ok(body) => body,
-        Err(_) => return ApiError::bad_request("Invalid JSON body").into_response(),
+        Err(_) => {
+            state.metrics().request_denied("pipeline", "invalid_json");
+            return ApiError::bad_request("Invalid JSON body").into_response();
+        }
     };
 
     let commands = match state.security().parse_command_list(&value) {
         Ok(commands) => commands,
         Err(error) => {
             state.metrics().command_denied(target.id(), "pipeline");
+            state.metrics().request_denied("pipeline", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -161,18 +178,25 @@ pub async fn multi_exec(
 
     let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
-        Err(error) => return error.into_response(),
+        Err(error) => {
+            state.metrics().request_denied("multi_exec", "auth");
+            return error.into_response();
+        }
     };
 
     let Json(value) = match body {
         Ok(body) => body,
-        Err(_) => return ApiError::bad_request("Invalid JSON body").into_response(),
+        Err(_) => {
+            state.metrics().request_denied("multi_exec", "invalid_json");
+            return ApiError::bad_request("Invalid JSON body").into_response();
+        }
     };
 
     let commands = match state.security().parse_command_list(&value) {
         Ok(commands) => commands,
         Err(error) => {
             state.metrics().command_denied(target.id(), "multi_exec");
+            state.metrics().request_denied("multi_exec", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
