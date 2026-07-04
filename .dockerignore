@@ -1,9 +1,9 @@
-.docs
 .git
 .github
 .gitignore
 .env*
 *.log
+docs
 node_modules
 target
 
@@ -13,3 +13,4 @@ pnpm-lock.yaml
 token.example.json
 
 CODE_OF_CONDUCT.md
+SECURITY.md
