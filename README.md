@@ -336,12 +336,18 @@ Metrics:
 
 | Metric | Purpose |
 | --- | --- |
-| `rrb_auth_failed_total` | Auth failures |
-| `rrb_command_denied_total` | Denied commands |
-| `rrb_redis_operations_total` | Redis operations |
-| `rrb_redis_operation_duration_seconds` | Redis latency |
-| `rrb_inflight_redis_operations` | In-flight operations |
-| `rrb_configured_targets` | Loaded targets |
+| `rrb_auth_failed_total` | Failed authentication attempts. |
+| `rrb_auth_lockouts_total` | Client IP lockouts created. |
+| `rrb_auth_locked_requests_total` | Requests rejected while locked out. |
+| `rrb_auth_lockout_entry_limit_total` | Lockout table capacity rejections. |
+| `rrb_auth_lockout_tracked_ips` | Currently tracked lockout entries. |
+| `rrb_auth_lockout_locked_ips` | Currently locked client IPs. |
+| `rrb_request_denied_total` | Pre-Redis denied requests by route and reason. |
+| `rrb_command_denied_total` | Commands denied by bridge policy. |
+| `rrb_redis_operations_total` | Redis operations executed. |
+| `rrb_redis_operation_duration_seconds` | Redis operation latency. |
+| `rrb_inflight_redis_operations` | In-flight Redis operations. |
+| `rrb_configured_targets` | Loaded Redis targets. |
 
 Prometheus:
 

@@ -2,7 +2,6 @@ use std::net::IpAddr;
 
 use anyhow::{anyhow, bail};
 use axum::http::HeaderMap;
-use tracing::warn;
 
 use super::headers::forwarded_ip;
 use super::parse::{prefix_mask_v4, prefix_mask_v6};
@@ -48,16 +47,7 @@ impl TrustedProxies {
             return peer_ip;
         }
 
-        if let Some(client_ip) = forwarded_ip(headers) {
-            return client_ip;
-        }
-
-        warn!(
-            peer_ip = %peer_ip,
-            "Trusted proxy request did not include a valid client IP header"
-        );
-
-        peer_ip
+        forwarded_ip(headers).unwrap_or(peer_ip)
     }
 
     fn is_trusted(&self, ip: IpAddr) -> bool {

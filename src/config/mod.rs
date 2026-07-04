@@ -96,24 +96,24 @@ impl BridgeConfig {
         let auth_lockout_max_entries =
             parse_env_or_default("RRB_AUTH_LOCKOUT_MAX_ENTRIES", 65_536)?;
         let trust_proxy_headers = parse_bool_env("RRB_TRUST_PROXY_HEADERS", false)?;
-        let trusted_proxies_value = env_first(&["RRB_TRUSTED_PROXIES"]);
-        let trusted_proxies = trusted_proxies_value
-            .as_deref()
-            .map(TrustedProxies::parse)
-            .transpose()?
-            .unwrap_or_default();
 
-        if trust_proxy_headers && trusted_proxies.is_empty() {
-            bail!(
-                "RRB_TRUSTED_PROXIES must include at least one IP or CIDR when RRB_TRUST_PROXY_HEADERS=true"
-            );
-        }
+        let trusted_proxies = if trust_proxy_headers {
+            let trusted_proxies = env_first(&["RRB_TRUSTED_PROXIES"])
+                .as_deref()
+                .map(TrustedProxies::parse)
+                .transpose()?
+                .unwrap_or_default();
 
-        if !trust_proxy_headers && trusted_proxies_value.is_some() {
-            bail!(
-                "RRB_TRUST_PROXY_HEADERS=true is required when RRB_TRUSTED_PROXIES is configured"
-            );
-        }
+            if trusted_proxies.is_empty() {
+                bail!(
+                    "RRB_TRUSTED_PROXIES must include at least one IP or CIDR when RRB_TRUST_PROXY_HEADERS=true"
+                );
+            }
+
+            trusted_proxies
+        } else {
+            TrustedProxies::default()
+        };
 
         let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
