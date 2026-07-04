@@ -88,7 +88,6 @@ A secure deployment still requires appropriate controls outside the bridge proce
 - Updates will be released as soon as possible after a vulnerability is confirmed
 - If a critical vulnerability is found, we will release a patch version immediately
 
-
 ## Security Monitoring
 
 We continuously monitor our codebase for security issues through:
