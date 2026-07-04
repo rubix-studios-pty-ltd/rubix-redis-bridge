@@ -1,6 +1,7 @@
 mod auth;
 mod error;
 mod handlers;
+mod lockout;
 mod redis_error;
 mod redis_exec;
 mod redis_value;

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,9 +9,12 @@ use axum::http::HeaderMap;
 use redis::aio::ConnectionManager;
 use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
+use crate::client::TrustedProxies;
 use crate::config::{BridgeConfig, RedisTargetConfig};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
+
+use super::lockout::AuthLockout;
 
 pub struct AppState {
     pub(crate) targets: HashMap<String, Arc<RedisTarget>>,
@@ -18,6 +22,9 @@ pub struct AppState {
     pub(crate) request_timeout: Duration,
     pub(crate) metrics: Metrics,
     pub(crate) metrics_token: Option<String>,
+    pub(crate) auth_lockout: AuthLockout,
+    pub(crate) trust_proxy_headers: bool,
+    pub(crate) trusted_proxies: TrustedProxies,
 }
 
 pub(crate) struct RedisTarget {
@@ -33,6 +40,8 @@ impl fmt::Debug for AppState {
             .field("target_count", &self.targets.len())
             .field("security", &self.security)
             .field("request_timeout", &self.request_timeout)
+            .field("trust_proxy_headers", &self.trust_proxy_headers)
+            .field("trusted_proxy_count", &self.trusted_proxies.len())
             .finish()
     }
 }
@@ -76,6 +85,14 @@ impl AppState {
             request_timeout: config.request_timeout,
             metrics,
             metrics_token: config.metrics_token,
+            auth_lockout: AuthLockout::new(
+                config.auth_lockout_failures,
+                config.auth_lockout_window,
+                config.auth_lockout_duration,
+                config.auth_lockout_max_entries,
+            ),
+            trust_proxy_headers: config.trust_proxy_headers,
+            trusted_proxies: config.trusted_proxies,
         })
     }
 
@@ -97,6 +114,14 @@ impl AppState {
 
     pub(crate) fn security(&self) -> &SecurityPolicy {
         &self.security
+    }
+
+    pub(crate) fn client_ip(&self, headers: &HeaderMap, peer: SocketAddr) -> IpAddr {
+        if !self.trust_proxy_headers {
+            return peer.ip();
+        }
+
+        self.trusted_proxies.resolve(headers, peer.ip())
     }
 
     pub(crate) fn base64(headers: &HeaderMap) -> bool {

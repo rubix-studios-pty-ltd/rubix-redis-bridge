@@ -1,0 +1,5 @@
+target
+.git
+.env
+*.log
+node_modules
