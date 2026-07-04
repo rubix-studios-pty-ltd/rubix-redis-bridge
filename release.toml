@@ -1,0 +1,18 @@
+allow-branch = ["main"]
+
+publish = false
+push = true
+tag = true
+
+tag-name = "v{{version}}"
+pre-release-commit-message = "chore: release {{version}}"
+tag-message = "chore: release {{version}}"
+
+pre-release-hook = [
+  "pwsh",
+  "-NoProfile",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/release-prep.ps1"
+]
