@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use tracing::error;
 
 use crate::metrics::Metrics;
+use crate::security::CommandArg;
 
 use super::error::ApiError;
 use super::redis_exec::{execute_command, execute_pipeline, execute_transaction};
@@ -75,7 +76,7 @@ pub async fn command(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-    body: Result<Json<Value>, JsonRejection>,
+    body: Result<Json<Vec<CommandArg>>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
@@ -88,7 +89,7 @@ pub async fn command(
         }
     };
 
-    let Json(value) = match body {
+    let Json(command_body) = match body {
         Ok(body) => body,
         Err(_) => {
             state.metrics().request_denied("command", "invalid_json");
@@ -96,7 +97,7 @@ pub async fn command(
         }
     };
 
-    let command = match state.security().parse_command(&value) {
+    let command = match state.security().parse_command(&command_body) {
         Ok(command) => command,
         Err(error) => {
             state.metrics().command_denied(target.id(), "single");
@@ -110,6 +111,8 @@ pub async fn command(
         command,
         base64_encoding,
         state.request_timeout(),
+        state.acquire_timeout(),
+        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await
@@ -123,7 +126,7 @@ pub async fn pipeline(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-    body: Result<Json<Value>, JsonRejection>,
+    body: Result<Json<Vec<Vec<CommandArg>>>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
@@ -136,7 +139,7 @@ pub async fn pipeline(
         }
     };
 
-    let Json(value) = match body {
+    let Json(command_body) = match body {
         Ok(body) => body,
         Err(_) => {
             state.metrics().request_denied("pipeline", "invalid_json");
@@ -144,7 +147,7 @@ pub async fn pipeline(
         }
     };
 
-    let commands = match state.security().parse_command_list(&value) {
+    let commands = match state.security().parse_command_list(&command_body) {
         Ok(commands) => commands,
         Err(error) => {
             state.metrics().command_denied(target.id(), "pipeline");
@@ -158,6 +161,8 @@ pub async fn pipeline(
         commands,
         base64_encoding,
         state.request_timeout(),
+        state.acquire_timeout(),
+        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await
@@ -171,7 +176,7 @@ pub async fn multi_exec(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-    body: Result<Json<Value>, JsonRejection>,
+    body: Result<Json<Vec<Vec<CommandArg>>>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
@@ -184,7 +189,7 @@ pub async fn multi_exec(
         }
     };
 
-    let Json(value) = match body {
+    let Json(command_body) = match body {
         Ok(body) => body,
         Err(_) => {
             state.metrics().request_denied("multi_exec", "invalid_json");
@@ -192,7 +197,7 @@ pub async fn multi_exec(
         }
     };
 
-    let commands = match state.security().parse_command_list(&value) {
+    let commands = match state.security().parse_command_list(&command_body) {
         Ok(commands) => commands,
         Err(error) => {
             state.metrics().command_denied(target.id(), "multi_exec");
@@ -206,6 +211,8 @@ pub async fn multi_exec(
         commands,
         base64_encoding,
         state.request_timeout(),
+        state.acquire_timeout(),
+        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await

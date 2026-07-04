@@ -142,7 +142,10 @@ fn keep_locked_additional_failures() {
     assert_not_locked(lockout.record_failure_at(ip, now + Duration::from_secs(1)));
     assert_locked(lockout.record_failure_at(ip, now + Duration::from_secs(2)));
 
-    let _ = lockout.record_failure_at(ip, now + Duration::from_secs(3));
+    assert_eq!(
+        lockout.record_failure_at(ip, now + Duration::from_secs(3)),
+        AuthFailureResult::AlreadyLocked
+    );
 
     assert!(lockout.is_locked_at(ip, now + Duration::from_secs(4)));
 }

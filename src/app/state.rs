@@ -20,6 +20,8 @@ pub struct AppState {
     pub(crate) targets: HashMap<String, Arc<RedisTarget>>,
     pub(crate) security: SecurityPolicy,
     pub(crate) request_timeout: Duration,
+    pub(crate) acquire_timeout: Duration,
+    pub(crate) max_response_bytes: usize,
     pub(crate) metrics: Metrics,
     pub(crate) metrics_token: Option<String>,
     pub(crate) auth_lockout: AuthLockout,
@@ -40,6 +42,8 @@ impl fmt::Debug for AppState {
             .field("target_count", &self.targets.len())
             .field("security", &self.security)
             .field("request_timeout", &self.request_timeout)
+            .field("acquire_timeout", &self.acquire_timeout)
+            .field("max_response_bytes", &self.max_response_bytes)
             .field("trust_proxy_headers", &self.trust_proxy_headers)
             .field("trusted_proxy_count", &self.trusted_proxies.len())
             .finish()
@@ -83,6 +87,8 @@ impl AppState {
             targets,
             security: config.security,
             request_timeout: config.request_timeout,
+            acquire_timeout: config.acquire_timeout,
+            max_response_bytes: config.max_response_bytes,
             metrics,
             metrics_token: config.metrics_token,
             auth_lockout: AuthLockout::new(
@@ -98,6 +104,14 @@ impl AppState {
 
     pub(crate) fn request_timeout(&self) -> Duration {
         self.request_timeout
+    }
+
+    pub(crate) fn acquire_timeout(&self) -> Duration {
+        self.acquire_timeout
+    }
+
+    pub(crate) fn max_response_bytes(&self) -> usize {
+        self.max_response_bytes
     }
 
     pub(crate) fn target_count(&self) -> usize {

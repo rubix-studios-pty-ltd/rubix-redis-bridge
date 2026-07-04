@@ -27,6 +27,8 @@ pub struct BridgeConfig {
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
     pub request_timeout: Duration,
+    pub acquire_timeout: Duration,
+    pub max_response_bytes: usize,
     pub metrics_token: Option<String>,
     pub auth_lockout_failures: usize,
     pub auth_lockout_window: Duration,
@@ -56,6 +58,8 @@ impl fmt::Debug for BridgeConfig {
             .field("max_body_bytes", &self.max_body_bytes)
             .field("max_concurrency", &self.max_concurrency)
             .field("request_timeout", &self.request_timeout)
+            .field("acquire_timeout", &self.acquire_timeout)
+            .field("max_response_bytes", &self.max_response_bytes)
             .field("metrics_token_configured", &self.metrics_token.is_some())
             .field("auth_lockout_failures", &self.auth_lockout_failures)
             .field("auth_lockout_window", &self.auth_lockout_window)
@@ -88,6 +92,8 @@ impl BridgeConfig {
         let max_command_args = parse_env_or_default("RRB_MAX_COMMAND_ARGS", 256)?;
         let max_arg_bytes = parse_env_or_default("RRB_MAX_ARG_BYTES", 256 * 1024)?;
         let request_timeout_ms: u64 = parse_env_or_default("RRB_REQUEST_TIMEOUT_MS", 5_000)?;
+        let acquire_timeout_ms: u64 = parse_env_or_default("RRB_ACQUIRE_TIMEOUT_MS", 100)?;
+        let max_response_bytes = parse_env_or_default("RRB_MAX_RESPONSE_BYTES", 10 * 1024 * 1024)?;
         let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
         let auth_lockout_failures = parse_env_or_default("RRB_AUTH_LOCKOUT_FAILURES", 10)?;
         let auth_lockout_window_seconds: u64 =
@@ -164,6 +170,14 @@ impl BridgeConfig {
             bail!("RRB_REQUEST_TIMEOUT_MS must be greater than zero");
         }
 
+        if acquire_timeout_ms == 0 {
+            bail!("RRB_ACQUIRE_TIMEOUT_MS must be greater than zero");
+        }
+
+        if max_response_bytes == 0 {
+            bail!("RRB_MAX_RESPONSE_BYTES must be greater than zero");
+        }
+
         let metrics_token = env_first(&["RRB_METRICS_TOKEN"])
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
@@ -181,6 +195,8 @@ impl BridgeConfig {
             max_body_bytes,
             max_concurrency,
             request_timeout: Duration::from_millis(request_timeout_ms),
+            acquire_timeout: Duration::from_millis(acquire_timeout_ms),
+            max_response_bytes,
             metrics_token,
             auth_lockout_failures,
             auth_lockout_window: Duration::from_secs(auth_lockout_window_seconds),

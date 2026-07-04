@@ -82,10 +82,7 @@ impl AuthLockout {
         self.max_failures > 0
     }
 
-    pub(crate) fn is_locked(&self, ip: IpAddr) -> bool {
-        self.is_locked_at(ip, Instant::now())
-    }
-
+    #[cfg(test)]
     fn is_locked_at(&self, ip: IpAddr, now: Instant) -> bool {
         if !self.is_enabled() {
             return false;
@@ -93,22 +90,12 @@ impl AuthLockout {
 
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
 
-        let Some(state) = entries.get(&ip) else {
-            return false;
-        };
+        Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
 
-        match state.locked_until {
-            Some(until) if until > now => true,
-            Some(_) => {
-                entries.remove(&ip);
-                false
-            }
-            None if now.duration_since(state.last_seen_at) >= self.failure_window => {
-                entries.remove(&ip);
-                false
-            }
-            None => false,
-        }
+        entries
+            .get(&ip)
+            .and_then(|state| state.locked_until)
+            .is_some_and(|until| until > now)
     }
 
     pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailureResult {

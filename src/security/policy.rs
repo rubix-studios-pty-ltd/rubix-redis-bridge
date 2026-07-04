@@ -2,12 +2,10 @@ use std::collections::HashSet;
 use std::fmt;
 
 use anyhow::{anyhow, bail};
-use serde_json::Value;
 
-use super::args::json_to_arg;
 use super::deny::{is_denied_command, reject_command};
 use super::script::validate_subcommand;
-use super::types::RedisCommand;
+use super::types::{CommandArg, RedisCommand};
 
 #[derive(Clone)]
 pub struct SecurityPolicy {
@@ -56,19 +54,14 @@ impl SecurityPolicy {
         Ok(())
     }
 
-    pub fn parse_command(&self, value: &Value) -> anyhow::Result<RedisCommand> {
-        let array = value
-            .as_array()
-            .ok_or_else(|| anyhow!("Invalid command array. Expected a JSON array at the root."))?;
-
+    pub fn parse_command(&self, array: &[CommandArg]) -> anyhow::Result<RedisCommand> {
         self.parse_command_array(array)
     }
 
-    pub fn parse_command_list(&self, value: &Value) -> anyhow::Result<Vec<RedisCommand>> {
-        let commands = value.as_array().ok_or_else(|| {
-            anyhow!("Invalid command array. Expected an array of command arrays at the root.")
-        })?;
-
+    pub fn parse_command_list(
+        &self,
+        commands: &[Vec<CommandArg>],
+    ) -> anyhow::Result<Vec<RedisCommand>> {
         if commands.len() > self.max_pipeline_commands {
             bail!(
                 "Pipeline is too large. Maximum allowed commands: {}.",
@@ -78,19 +71,11 @@ impl SecurityPolicy {
 
         commands
             .iter()
-            .map(|command| {
-                let command_array = command.as_array().ok_or_else(|| {
-                    anyhow!(
-                        "Invalid command array. Expected an array of command arrays at the root."
-                    )
-                })?;
-
-                self.parse_command_array(command_array)
-            })
+            .map(|command| self.parse_command_array(command))
             .collect()
     }
 
-    fn parse_command_array(&self, array: &[Value]) -> anyhow::Result<RedisCommand> {
+    fn parse_command_array(&self, array: &[CommandArg]) -> anyhow::Result<RedisCommand> {
         if array.is_empty() {
             bail!("Invalid command array. Command cannot be empty.");
         }
@@ -103,7 +88,7 @@ impl SecurityPolicy {
         }
 
         let command_name = array[0]
-            .as_str()
+            .as_command_name()
             .ok_or_else(|| {
                 anyhow!("Invalid command array. First item must be a Redis command string.")
             })?
@@ -134,7 +119,7 @@ impl SecurityPolicy {
 
         let args = array[1..]
             .iter()
-            .map(|value| json_to_arg(value, self.max_arg_bytes))
+            .map(|value| value.to_arg_bytes(self.max_arg_bytes))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(RedisCommand {

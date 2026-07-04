@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
 
-use super::SecurityPolicy;
 use super::deny::{denied_commands, is_denied_command};
+use super::{CommandArg, SecurityPolicy};
 
 fn policy() -> SecurityPolicy {
     SecurityPolicy {
@@ -27,7 +27,12 @@ fn ratelimit_policy() -> SecurityPolicy {
     policy
 }
 
-fn error_contains(policy: &SecurityPolicy, command: Value, expected: &str) {
+fn command(value: Value) -> Vec<CommandArg> {
+    serde_json::from_value(value).unwrap()
+}
+
+fn error_contains(policy: &SecurityPolicy, value: Value, expected: &str) {
+    let command = command(value);
     let err = policy.parse_command(&command).unwrap_err();
     let message = err.to_string();
 
@@ -106,7 +111,11 @@ fn accept_valid_command_when_arg_max() {
 
     policy.max_command_args = usize::MAX;
 
-    assert!(policy.parse_command(&json!(["GET", "key"])).is_ok());
+    assert!(
+        policy
+            .parse_command(&command(json!(["GET", "key"])))
+            .is_ok()
+    );
 }
 
 #[test]
@@ -123,7 +132,7 @@ fn accept_ratelimit_profile() {
 #[test]
 fn accept_ratelimit_script_flush() {
     let command = ratelimit_policy()
-        .parse_command(&json!(["SCRIPT", "FLUSH"]))
+        .parse_command(&command(json!(["SCRIPT", "FLUSH"])))
         .unwrap();
 
     assert_eq!(command.name, "SCRIPT");
@@ -132,7 +141,7 @@ fn accept_ratelimit_script_flush() {
 #[test]
 fn accept_ratelimit_script_flush_sync() {
     let command = ratelimit_policy()
-        .parse_command(&json!(["SCRIPT", "FLUSH", "SYNC"]))
+        .parse_command(&command(json!(["SCRIPT", "FLUSH", "SYNC"])))
         .unwrap();
 
     assert_eq!(command.name, "SCRIPT");

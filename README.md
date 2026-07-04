@@ -148,6 +148,8 @@ RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,D
 
 ## Upstash Ratelimit
 
+`RRB_UPSTASH_RATELIMIT=true` is a trust escalation. It allows the bridge policy to admit `EVAL`, `EVALSHA`, and restricted `SCRIPT` commands when they are also included in `RRB_ALLOWED_COMMANDS`. Those commands execute server-side Lua and should be treated as dangerous outside a controlled deployment.
+
 `@upstash/ratelimit` uses Redis Lua scripting for atomic rate-limit operations, which requires a narrower and more controlled command policy than standard Redis commands.
 
 The package typically attempts `EVALSHA` first, then falls back to `EVAL` when Redis returns `NOSCRIPT`.
@@ -163,7 +165,7 @@ When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy w
 
 `SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
 
-Only enable this for trusted applications and private deployments.
+Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, or weakly authenticated callers.
 
 ## Command policy
 
@@ -241,17 +243,23 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_MAX_PIPELINE_COMMANDS` | `1000` | Pipeline command count limit |
 | `RRB_MAX_COMMAND_ARGS` | `256` | Per-command argument count limit |
 | `RRB_MAX_ARG_BYTES` | `262144` | Per-argument byte limit |
-| `RRB_REQUEST_TIMEOUT_MS` | `5000` | Timeout for Redis connection acquisition and execution |
+| `RRB_MAX_RESPONSE_BYTES` | `10485760` | Encoded Redis response byte limit |
+| `RRB_REQUEST_TIMEOUT_MS` | `5000` | Timeout for Redis operation execution |
+| `RRB_ACQUIRE_TIMEOUT_MS` | `100` | Timeout while waiting for target Redis operation capacity |
 | `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | File config path |
 | `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternate config path |
 
 `RRB_MAX_CONNECTIONS` is an in-flight Redis operation cap. It does not create dedicated Redis TCP connections.
 
-`RRB_REQUEST_TIMEOUT_MS` covers Redis connection acquisition and command execution. A stuck backend returns `504`.
+`RRB_ACQUIRE_TIMEOUT_MS` applies backpressure before Redis execution. When the target operation gate is saturated, the bridge rejects quickly with `429` instead of retaining many request bodies while waiting for Redis capacity.
+
+`RRB_REQUEST_TIMEOUT_MS` covers Redis connection acquisition and command execution after an operation permit is available. A stuck backend returns `504`.
+
+`RRB_MAX_RESPONSE_BYTES` limits the encoded JSON response returned by the bridge. This prevents unbounded HTTP responses from Redis values such as large lists, large hashes, or large binary strings.
 
 ## Trusted Proxy
 
-`RRB_AUTH_LOCKOUT_FAILURES` counts failed authentication attempts per client IP within `RRB_AUTH_LOCKOUT_WINDOW_SECONDS`. When the threshold is reached, the IP is blocked for `RRB_AUTH_LOCKOUT_SECONDS`.
+`RRB_AUTH_LOCKOUT_FAILURES` counts failed authentication attempts per client IP within `RRB_AUTH_LOCKOUT_WINDOW_SECONDS`. When the threshold is reached, invalid or missing credentials from that IP are blocked for `RRB_AUTH_LOCKOUT_SECONDS`. A valid bearer token can still authenticate from the same IP.
 
 `RRB_AUTH_LOCKOUT_MAX_ENTRIES` caps the number of tracked client IPs. Stale entries are cleaned before new entries are rejected.
 
@@ -325,7 +333,7 @@ Health and metrics endpoints support operational monitoring without placing Redi
 
 Backend failures are returned per command as `503`.
 
-`GET /metrics` exposes Prometheus metrics and requires `RRB_METRICS_TOKEN`.
+`GET /metrics` exposes Prometheus metrics and requires `RRB_METRICS_TOKEN`. Do not expose this endpoint to external networks. Bind it privately, scrape it over an internal network, or protect it behind trusted infrastructure access controls.
 
 ```bash
 curl -sS http://127.0.0.1:7777/metrics \

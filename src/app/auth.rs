@@ -37,21 +37,6 @@ impl AppState {
         }
     }
 
-    fn check_lockout(&self, ip: IpAddr) -> Result<(), ApiError> {
-        if self.auth_lockout.is_locked(ip) {
-            self.metrics.locked_request();
-            self.refresh_lockout_metrics();
-
-            return Err(ApiError::too_many_requests(
-                "Too many failed authentication attempts",
-            ));
-        }
-
-        self.refresh_lockout_metrics();
-
-        Ok(())
-    }
-
     fn bearer_token<'a>(&self, headers: &'a HeaderMap, ip: IpAddr) -> Result<&'a str, ApiError> {
         let auth_header = headers
             .get("authorization")
@@ -79,8 +64,6 @@ impl AppState {
     }
 
     pub(crate) fn metrics_auth(&self, headers: &HeaderMap, ip: IpAddr) -> Result<(), ApiError> {
-        self.check_lockout(ip)?;
-
         let Some(metrics_token) = self.metrics_token.as_deref() else {
             return Err(ApiError::unauthorized(
                 "Metrics authentication is not configured",
@@ -104,8 +87,6 @@ impl AppState {
         headers: &HeaderMap,
         ip: IpAddr,
     ) -> Result<Arc<RedisTarget>, ApiError> {
-        self.check_lockout(ip)?;
-
         let token = self.bearer_token(headers, ip)?;
         let mut matched_target = None;
 

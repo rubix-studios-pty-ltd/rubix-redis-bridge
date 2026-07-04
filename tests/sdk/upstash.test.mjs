@@ -7,7 +7,7 @@ const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:7777'
 const token = process.env.RRB_TOKEN
 
 if (!token) {
-  throw new Error('RRB_TOKEN is required for SDK compatibility tests')
+  throw new Error('RRB_TOKEN is required for tests')
 }
 
 const redis = new Redis({
@@ -51,7 +51,7 @@ async function ratelimitDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge is running without Upstash ratelimit compatibility')
+    t.skip('Bridge is running without Upstash ratelimit')
     return true
   }
 
@@ -66,14 +66,14 @@ async function scriptFlushDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge is running without SCRIPT FLUSH compatibility')
+    t.skip('Bridge is running without SCRIPT FLUSH')
     return true
   }
 
   assert.fail(`Unexpected SCRIPT FLUSH failure: ${JSON.stringify(command.body)}`)
 }
 
-test('Single string commands work through @upstash/redis', async () => {
+test('Test(@upstash/redis): single string commands', async () => {
   await redis.del('sdk:hello')
 
   const setResult = await redis.set('sdk:hello', 'world')
@@ -92,13 +92,13 @@ test('Single string commands work through @upstash/redis', async () => {
   assert.equal(missing, null)
 })
 
-test('PING works through @upstash/redis', async () => {
+test('Test(@upstash/redis): ping/pong request received', async () => {
   const ping = await redis.ping()
 
   assert.equal(ping, 'PONG')
 })
 
-test('Numeric commands work through @upstash/redis', async () => {
+test('Test(@upstash/redis): numeric commands', async () => {
   await redis.del('sdk:number')
 
   const setResult = await redis.set('sdk:number', '1')
@@ -111,7 +111,7 @@ test('Numeric commands work through @upstash/redis', async () => {
   assert.equal(decremented, 1)
 })
 
-test('TTL and EXPIRE commands work through @upstash/redis', async () => {
+test('Test(@upstash/redis): ttl and expire commands', async () => {
   await redis.del('sdk:ttl')
 
   const setResult = await redis.set('sdk:ttl', '1', { ex: 60 })
@@ -129,7 +129,7 @@ test('TTL and EXPIRE commands work through @upstash/redis', async () => {
   assert.ok(updatedTtl <= 120)
 })
 
-test('Missing keys return null through @upstash/redis', async () => {
+test('Test(@upstash/redis): missing keys return null', async () => {
   await redis.del('sdk:missing')
   await redis.del('sdk:missing-hash')
 
@@ -137,7 +137,7 @@ test('Missing keys return null through @upstash/redis', async () => {
   assert.equal(await redis.hget('sdk:missing-hash', 'field'), null)
 })
 
-test('Hash commands work through @upstash/redis', async () => {
+test('Test(@upstash/redis): hash commands', async () => {
   await redis.del('sdk:h')
 
   const hsetResult = await redis.hset('sdk:h', {
@@ -168,7 +168,7 @@ test('Hash commands work through @upstash/redis', async () => {
   })
 })
 
-test('HMGET works through raw Upstash-style command shape', async () => {
+test('Test(@upstash/redis): hmget commands', async () => {
   await redis.del('sdk:hmget')
 
   const hsetResult = await redis.hset('sdk:hmget', {
@@ -184,7 +184,7 @@ test('HMGET works through raw Upstash-style command shape', async () => {
   assert.deepEqual(result.result, ['one', 'two', null])
 })
 
-test('Pipeline works through @upstash/redis', async () => {
+test('Test(@upstash/redis): pipeline commands', async () => {
   await redis.del('sdk:pipeline')
 
   const pipeline = redis.pipeline()
@@ -200,7 +200,7 @@ test('Pipeline works through @upstash/redis', async () => {
   assert.deepEqual(result, ['OK', 'v1', 1, 1, 0])
 })
 
-test('Pipeline keeps per-command Redis errors when keepErrors is true', async () => {
+test('Test(@upstash/redis): pipeline per-command errors', async () => {
   await redis.del('sdk:num')
 
   const pipeline = redis.pipeline()
@@ -231,7 +231,7 @@ test('Pipeline keeps per-command Redis errors when keepErrors is true', async ()
   assert.equal(third.error, undefined)
 })
 
-test('Multi exec works through @upstash/redis', async () => {
+test('Test(@upstash/redis): multi exec commands', async () => {
   await redis.del('sdk:counter')
 
   const tx = redis.multi()
@@ -246,7 +246,7 @@ test('Multi exec works through @upstash/redis', async () => {
   assert.deepEqual(result, ['OK', 2, 1, 1])
 })
 
-test('Raw command endpoint matches Upstash-style JSON response', async () => {
+test('Test(@upstash/redis): command endpoint matches upstash response', async () => {
   await redis.del('sdk:raw')
 
   const setResult = await rawCommand(['SET', 'sdk:raw', 'ok'])
@@ -258,7 +258,7 @@ test('Raw command endpoint matches Upstash-style JSON response', async () => {
   assert.equal(getResult.result, 'ok')
 })
 
-test('Unauthorized requests are rejected', async () => {
+test('Test(@upstash/redis): unauthorized requests rejected', async () => {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -271,7 +271,7 @@ test('Unauthorized requests are rejected', async () => {
   assert.equal(response.status, 401)
 })
 
-test('Dangerous commands are rejected before Redis execution', async () => {
+test('Test(@upstash/redis): dangerous commands rejected before execution', async () => {
   const result = await rawCommand(['FCALL', 'some_function', 0])
 
   assert.equal(result.status, 400)
@@ -279,14 +279,14 @@ test('Dangerous commands are rejected before Redis execution', async () => {
   assert.match(result.error, /hard-denied|not allowed/i)
 })
 
-test('Connection-state commands are rejected before Redis execution', async () => {
+test('Test(@upstash/redis): connection-state commands are rejected before execution', async () => {
   const result = await rawCommand(['SELECT', '1'])
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
 })
 
-test('Upstash ratelimit fixed window works through the bridge', async (t) => {
+test('Test(@upstash/redis): upstash ratelimit fixed window', async (t) => {
   if (await ratelimitDisabled(t)) {
     return
   }
@@ -317,7 +317,7 @@ test('Upstash ratelimit fixed window works through the bridge', async (t) => {
   assert.equal(third.remaining, 0)
 })
 
-test('Upstash ratelimit EVALSHA fallback to EVAL works after SCRIPT FLUSH', async (t) => {
+test('Test(@upstash/redis): upstash ratelimit fallback', async (t) => {
   if (await scriptFlushDisabled(t)) {
     return
   }

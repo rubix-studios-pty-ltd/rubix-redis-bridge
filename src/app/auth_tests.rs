@@ -59,6 +59,8 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
         max_body_bytes: 1024,
         max_concurrency: 16,
         request_timeout: Duration::from_millis(500),
+        acquire_timeout: Duration::from_millis(100),
+        max_response_bytes: 1024 * 1024,
         metrics_token: Some("metrics-token".to_string()),
         auth_lockout_failures,
         auth_lockout_window: Duration::from_secs(60),
@@ -93,7 +95,7 @@ fn lock_ip_repeat_failures() {
 }
 
 #[test]
-fn reject_token_ip_locked() {
+fn valid_token_bypasses_lockout() {
     let state = test_state(3);
     let ip = ip("203.0.113.10");
     let wrong_headers = auth_headers("wrong-token");
@@ -114,10 +116,7 @@ fn reject_token_ip_locked() {
         StatusCode::TOO_MANY_REQUESTS
     );
 
-    assert_eq!(
-        error_status(state.bridge_auth(&valid_headers, ip).unwrap_err()),
-        StatusCode::TOO_MANY_REQUESTS
-    );
+    assert!(state.bridge_auth(&valid_headers, ip).is_ok());
 }
 
 #[test]
