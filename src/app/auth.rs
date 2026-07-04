@@ -75,7 +75,7 @@ impl AppState {
         let snapshot = self.auth_lockout.snapshot();
 
         self.metrics
-            .set_auth_lockout_state(snapshot.tracked_ips, snapshot.locked_ips);
+            .set_lockout_state(snapshot.tracked_ips, snapshot.locked_ips);
     }
 
     pub(crate) fn metrics_auth(&self, headers: &HeaderMap, ip: IpAddr) -> Result<(), ApiError> {
