@@ -12,7 +12,7 @@ impl AppState {
     pub(crate) fn unauthorized(&self, ip: IpAddr, message: impl Into<String>) -> ApiError {
         self.metrics.auth_failed();
 
-        let result = self.auth_lockout.record_failure_result(ip);
+        let result = self.auth_lockout.record_failure(ip);
 
         match result {
             AuthFailureResult::Locked => {

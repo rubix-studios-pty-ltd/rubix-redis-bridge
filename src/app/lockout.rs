@@ -47,12 +47,6 @@ pub(crate) enum AuthFailureResult {
     EntryLimitReached,
 }
 
-impl AuthFailureResult {
-    pub(crate) fn is_locked(self) -> bool {
-        matches!(self, Self::Locked | Self::AlreadyLocked)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AuthLockoutSnapshot {
     pub(crate) tracked_ips: usize,
@@ -117,19 +111,11 @@ impl AuthLockout {
         }
     }
 
-    pub(crate) fn record_failure(&self, ip: IpAddr) -> bool {
-        self.record_failure_result(ip).is_locked()
+    pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailureResult {
+        self.record_failure_at(ip, Instant::now())
     }
 
-    pub(crate) fn record_failure_result(&self, ip: IpAddr) -> AuthFailureResult {
-        self.record_failure_result_at(ip, Instant::now())
-    }
-
-    fn record_failure_at(&self, ip: IpAddr, now: Instant) -> bool {
-        self.record_failure_result_at(ip, now).is_locked()
-    }
-
-    fn record_failure_result_at(&self, ip: IpAddr, now: Instant) -> AuthFailureResult {
+    fn record_failure_at(&self, ip: IpAddr, now: Instant) -> AuthFailureResult {
         if !self.is_enabled() {
             return AuthFailureResult::Disabled;
         }
