@@ -226,6 +226,12 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
 | `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
 | `RRB_UPSTASH_RATELIMIT` | `false` | Enables ratelimit compatibility |
+| `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Auth failures before lockout |
+| `RRB_AUTH_LOCKOUT_WINDOW_SECONDS` | `300` | Failure counting window |
+| `RRB_AUTH_LOCKOUT_SECONDS` | `300` | Lockout duration |
+| `RRB_AUTH_LOCKOUT_MAX_ENTRIES` | `65536` | Tracked IP limit |
+| `RRB_TRUST_PROXY_HEADERS` | `false` | Enables trusted proxy headers |
+| `RRB_TRUSTED_PROXIES` | none | Trusted proxy IPs or CIDRs |
 | `RRB_CONNECTION_STRING` | none | Redis URL in `env` mode |
 | `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
 | `RRB_ALLOWED_COMMANDS` | conservative default | Allowed commands |
@@ -242,6 +248,33 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 `RRB_MAX_CONNECTIONS` is an in-flight Redis operation cap. It does not create dedicated Redis TCP connections.
 
 `RRB_REQUEST_TIMEOUT_MS` covers Redis connection acquisition and command execution. A stuck backend returns `504`.
+
+## Trusted Proxy
+
+`RRB_AUTH_LOCKOUT_FAILURES` counts failed authentication attempts per client IP within `RRB_AUTH_LOCKOUT_WINDOW_SECONDS`. When the threshold is reached, the IP is blocked for `RRB_AUTH_LOCKOUT_SECONDS`.
+
+`RRB_AUTH_LOCKOUT_MAX_ENTRIES` caps the number of tracked client IPs. Stale entries are cleaned before new entries are rejected.
+
+`RRB_TRUST_PROXY_HEADERS` enables forwarded client IP resolution behind a trusted reverse proxy. It is disabled by default.
+
+`RRB_TRUSTED_PROXIES` defines which proxy IPs or CIDR ranges are allowed to provide client IP headers.
+
+```bash
+RRB_TRUST_PROXY_HEADERS=true
+RRB_TRUSTED_PROXIES=127.0.0.1/32,172.20.0.0/16
+```
+
+Only include proxies that overwrite or sanitize forwarded headers. Requests from untrusted peers cannot control the client IP used for authentication lockout.
+
+Supported client IP headers are checked in this order:
+
+```txt
+CF-Connecting-IP
+True-Client-IP
+X-Forwarded-For
+X-Real-IP
+Forwarded
+```
 
 ## File mode
 

@@ -92,3 +92,7 @@ impl AppState {
         Ok(target)
     }
 }
+
+#[cfg(test)]
+#[path = "auth_tests.rs"]
+mod tests;

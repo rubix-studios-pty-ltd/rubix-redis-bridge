@@ -48,7 +48,9 @@ pub async fn metrics(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(error) = state.metrics_auth(&headers, addr.ip()) {
+    let client_ip = state.client_ip(&headers, addr);
+
+    if let Err(error) = state.metrics_auth(&headers, client_ip) {
         return error.into_response();
     }
 
@@ -73,8 +75,9 @@ pub async fn command(
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
+    let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, addr.ip()) {
+    let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };
@@ -113,8 +116,9 @@ pub async fn pipeline(
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
+    let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, addr.ip()) {
+    let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };
@@ -153,8 +157,9 @@ pub async fn multi_exec(
     body: Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let base64_encoding = AppState::base64(&headers);
+    let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, addr.ip()) {
+    let target = match state.bridge_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => return error.into_response(),
     };
