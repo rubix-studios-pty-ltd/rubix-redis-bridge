@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use super::{AuthFailureResult,AuthLockout};
+use super::{AuthFailureResult, AuthLockout};
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
