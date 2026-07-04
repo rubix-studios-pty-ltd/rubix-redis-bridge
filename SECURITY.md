@@ -21,9 +21,9 @@ We take the security of Rubix Redis Bridge seriously. If you believe you have fo
 
 1. **DO NOT** create a public GitHub issue for the vulnerability.
 2. Contact us directly at one of the following:
-   - X: [@rubixvi](https://x.com/rubixstory)
+   - X: [@rubixstory](https://x.com/rubixstory)
    - Email: [Contact Form](https://rubixstudios.com.au/contact)
-   - Facebook: [rubixvi](https://www.facebook.com/rubixstudios/)
+   - Facebook: [rubixstudios](https://www.facebook.com/rubixstudios)
 
 Please include the following details in your report:
 
@@ -87,7 +87,6 @@ A secure deployment still requires appropriate controls outside the bridge proce
 - Security patches are given the highest priority
 - Updates will be released as soon as possible after a vulnerability is confirmed
 - If a critical vulnerability is found, we will release a patch version immediately
-
 
 ## Security Monitoring
 
