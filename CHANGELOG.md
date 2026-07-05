@@ -1,18 +1,18 @@
 ## [0.3.3] - 2026-07-05
 
-### 🚜 Refactor
+### Refactor
 
 - Restructure Redis response handling and serialization
 - Unify Redis value handling across modules
 
-### ⚙️ Miscellaneous Tasks
+### Miscellaneous Tasks
 
 - Update package manager and reorder devDependencies
 - Update dependencies and improve Redis response handling
 
 ## [0.3.2] - 2026-07-05
 
-### 🚀 Features
+### Features
 
 - Prometheus /metrics
 - Add metrics token support and enhance metrics authentication
@@ -27,7 +27,7 @@
 - Implement response size limits and error handling for Redis operations
 - Enhance Redis command execution with response size limits
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 - Cosign image digest for docker
 - Security tests
@@ -43,12 +43,12 @@
 - Function name for set lockout state
 - Correct social media handles in SECURITY.md for accuracy
 
-### 💼 Other
+### Other
 
 - Reorganise config.rs to modular managable files
 - Organise env checks
 
-### 🚜 Refactor
+### Refactor
 
 - Update job names in workflows for clarity
 - Update default allowed and blocked commands in configuration
@@ -66,7 +66,7 @@
 - Enhance lockout test assertions for clarity
 - Update test names for upstash ratelimit consistency
 
-### 📚 Documentation
+### Documentation
 
 - Add RRB_METRICS_TOKEN to README for metrics authentication
 - ZINCRBY is required by upstash redis.
@@ -79,15 +79,15 @@
 - Updated docker image url
 - Improve documentations
 
-### 🎨 Styling
+### Styling
 
 - Format imports in lockout tests for consistency
 
-### 🧪 Testing
+### Testing
 
 - Enhance Upstash Redis tests with additional command coverage and error handling
 
-### ⚙️ Miscellaneous Tasks
+### Miscellaneous Tasks
 
 - Release pipeline hardening
 - Workflow premissions
