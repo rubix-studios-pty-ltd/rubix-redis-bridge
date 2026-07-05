@@ -1,16 +1,16 @@
-use redis::Value as RedisValue;
+use redis::Value;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
 use super::redis_value::RedisJson;
 
 pub(crate) enum RedisResponse {
-    Result(RedisValue),
+    Result(Value),
     Error(String),
 }
 
 pub(crate) struct CommandResponse<'a> {
-    pub(crate) result: &'a RedisValue,
+    pub(crate) result: &'a Value,
     pub(crate) base64_encoding: bool,
 }
 
@@ -74,7 +74,7 @@ impl Serialize for PipelineItem<'_> {
 }
 
 pub(crate) struct TransactionResponse<'a> {
-    pub(crate) values: &'a [RedisValue],
+    pub(crate) values: &'a [Value],
     pub(crate) base64_encoding: bool,
 }
 

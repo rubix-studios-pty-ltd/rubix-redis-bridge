@@ -2,7 +2,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use redis::Value as RedisValue;
+use redis::Value;
 use redis::aio::ConnectionManager;
 use tokio::time::timeout;
 use tracing::{error, warn};
@@ -21,7 +21,7 @@ pub(crate) async fn execute_command(
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<RedisValue, ApiError> {
+) -> Result<Value, ApiError> {
     execute_operation(
         target,
         "command",
@@ -36,7 +36,7 @@ pub(crate) async fn execute_command(
                 redis_command.arg(arg.as_slice());
             }
 
-            let result: redis::RedisResult<RedisValue> =
+            let result: redis::RedisResult<Value> =
                 redis_command.query_async(&mut connection).await;
 
             result.map_err(redis_api_error)
@@ -63,7 +63,7 @@ pub(crate) async fn execute_pipeline(
             let mut pipe = redis::pipe();
             append_commands(&mut pipe, commands);
 
-            let result: redis::RedisResult<Vec<redis::RedisResult<RedisValue>>> =
+            let result: redis::RedisResult<Vec<redis::RedisResult<Value>>> =
                 pipe.ignore_errors().query_async(&mut connection).await;
 
             result
@@ -88,7 +88,7 @@ pub(crate) async fn execute_transaction(
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Vec<RedisValue>, ApiError> {
+) -> Result<Vec<Value>, ApiError> {
     execute_operation(
         target,
         "multi_exec",
@@ -101,8 +101,7 @@ pub(crate) async fn execute_transaction(
             pipe.atomic();
             append_commands(&mut pipe, commands);
 
-            let result: redis::RedisResult<Vec<RedisValue>> =
-                pipe.query_async(&mut connection).await;
+            let result: redis::RedisResult<Vec<Value>> = pipe.query_async(&mut connection).await;
 
             result.map_err(redis_api_error)
         },

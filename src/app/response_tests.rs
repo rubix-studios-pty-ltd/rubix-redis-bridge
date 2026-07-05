@@ -1,12 +1,12 @@
 use axum::http::StatusCode;
-use redis::Value as RedisValue;
+use redis::Value;
 
 use super::redis_response::CommandResponse;
 use super::response::serialized_response;
 
 #[test]
 fn allow_size_limit() {
-    let result = RedisValue::BulkString(b"ok".to_vec());
+    let result = Value::BulkString(b"ok".to_vec());
 
     let response = serialized_response(
         StatusCode::OK,
@@ -22,7 +22,7 @@ fn allow_size_limit() {
 
 #[test]
 fn reject_size_limit() {
-    let result = RedisValue::BulkString(b"this response is too large".to_vec());
+    let result = Value::BulkString(b"this response is too large".to_vec());
 
     let response = serialized_response(
         StatusCode::OK,
