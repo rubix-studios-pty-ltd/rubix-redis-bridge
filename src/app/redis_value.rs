@@ -69,33 +69,55 @@ fn encode_array(values: Vec<RedisValue>, base64_encoding: bool) -> Value {
 }
 
 fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> Value {
-    let mut object = Map::new();
-    let mut pairs = Vec::with_capacity(entries.len());
-    let mut encode_object = true;
-
-    for (key, value) in entries {
-        let encoded_key = encode_value(key, base64_encoding);
-        let encoded_value = encode_value(value, base64_encoding);
-
-        if let Some(object_key) = encode_object_key(&encoded_key) {
-            if object.insert(object_key, encoded_value.clone()).is_some() {
-                encode_object = false;
-            }
-        } else {
-            encode_object = false;
-        }
-
-        pairs.push(Value::Array(vec![encoded_key, encoded_value]));
+    if can_encode_object(&entries, base64_encoding) {
+        return Value::Object(encode_object(entries, base64_encoding));
     }
 
-    if encode_object {
-        Value::Object(object)
-    } else {
-        json!({
-            "type": "map",
-            "value": pairs,
+    let pairs = entries
+        .into_iter()
+        .map(|(key, value)| {
+            Value::Array(vec![
+                encode_value(key, base64_encoding),
+                encode_value(value, base64_encoding),
+            ])
         })
+        .collect::<Vec<_>>();
+
+    json!({
+        "type": "map",
+        "value": pairs,
+    })
+}
+
+fn can_encode_object(entries: &[(RedisValue, RedisValue)], base64_encoding: bool) -> bool {
+    let mut keys = std::collections::HashSet::with_capacity(entries.len());
+
+    for (key, _) in entries {
+        let encoded_key = encode_value(key.clone(), base64_encoding);
+        let Some(object_key) = encode_object_key(&encoded_key) else {
+            return false;
+        };
+
+        if !keys.insert(object_key) {
+            return false;
+        }
     }
+
+    true
+}
+
+fn encode_object(
+    entries: Vec<(RedisValue, RedisValue)>,
+    base64_encoding: bool,
+) -> Map<String, Value> {
+    entries
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let encoded_key = encode_value(key, base64_encoding);
+            let object_key = encode_object_key(&encoded_key)?;
+            Some((object_key, encode_value(value, base64_encoding)))
+        })
+        .collect()
 }
 
 fn encode_object_key(value: &Value) -> Option<String> {

@@ -52,7 +52,7 @@ impl Collectors {
         let request_denied_total = IntCounterVec::new(
             Opts::new(
                 "rrb_request_denied_total",
-                "Total requests denied before Redis execution.",
+                "Total bridge requests denied before a successful response is returned.",
             ),
             &["route", "reason"],
         )?;

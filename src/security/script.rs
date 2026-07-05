@@ -1,10 +1,11 @@
 use anyhow::{anyhow, bail};
-use serde_json::Value;
 
-pub(crate) fn validate_subcommand(array: &[Value]) -> anyhow::Result<()> {
+use super::types::CommandArg;
+
+pub(crate) fn validate_subcommand(array: &[CommandArg]) -> anyhow::Result<()> {
     let subcommand = array
         .get(1)
-        .and_then(Value::as_str)
+        .and_then(CommandArg::as_command_name)
         .map(|value| value.trim().to_ascii_uppercase())
         .ok_or_else(|| anyhow!("SCRIPT requires a subcommand."))?;
 
@@ -30,7 +31,7 @@ pub(crate) fn validate_subcommand(array: &[Value]) -> anyhow::Result<()> {
 
             if let Some(mode) = array.get(2) {
                 let mode = mode
-                    .as_str()
+                    .as_command_name()
                     .map(|value| value.trim().to_ascii_uppercase())
                     .ok_or_else(|| anyhow!("SCRIPT FLUSH mode must be a string."))?;
 

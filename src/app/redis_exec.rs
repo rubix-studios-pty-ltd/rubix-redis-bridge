@@ -20,6 +20,7 @@ pub(crate) async fn execute_command(
     command: RedisCommand,
     base64_encoding: bool,
     request_timeout: Duration,
+    acquire_timeout: Duration,
     metrics: Metrics,
 ) -> Result<Value, ApiError> {
     execute_operation(
@@ -27,6 +28,7 @@ pub(crate) async fn execute_command(
         "command",
         "Redis command timed out",
         request_timeout,
+        acquire_timeout,
         metrics,
         move |mut connection| async move {
             let mut redis_command = redis::cmd(command.name.as_str());
@@ -51,6 +53,7 @@ pub(crate) async fn execute_pipeline(
     commands: Vec<RedisCommand>,
     base64_encoding: bool,
     request_timeout: Duration,
+    acquire_timeout: Duration,
     metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     execute_operation(
@@ -58,6 +61,7 @@ pub(crate) async fn execute_pipeline(
         "pipeline",
         "Redis pipeline timed out",
         request_timeout,
+        acquire_timeout,
         metrics,
         move |mut connection| async move {
             let mut pipe = redis::pipe();
@@ -90,6 +94,7 @@ pub(crate) async fn execute_transaction(
     commands: Vec<RedisCommand>,
     base64_encoding: bool,
     request_timeout: Duration,
+    acquire_timeout: Duration,
     metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     execute_operation(
@@ -97,6 +102,7 @@ pub(crate) async fn execute_transaction(
         "multi_exec",
         "Redis transaction timed out",
         request_timeout,
+        acquire_timeout,
         metrics,
         move |mut connection| async move {
             let mut pipe = redis::pipe();
@@ -124,6 +130,7 @@ async fn execute_operation<T, F, Fut>(
     operation_name: &'static str,
     timeout_message: &'static str,
     request_timeout: Duration,
+    acquire_timeout: Duration,
     metrics: Metrics,
     operation: F,
 ) -> Result<T, ApiError>
@@ -137,10 +144,20 @@ where
     let operation_metrics = metrics.begin_operation(target_id.clone(), operation_name);
 
     let result = timeout(request_timeout, async move {
-        let _permit = target.acquire_operation().await.map_err(|error| {
-            error!(%error, target = %task_id, "Redis operation limiter closed");
-            ApiError::unavailable("Redis backend unavailable")
-        })?;
+        let _permit = timeout(acquire_timeout, target.acquire_operation())
+            .await
+            .map_err(|_| {
+                warn!(
+                    target = %task_id,
+                    timeout_ms = acquire_timeout.as_millis(),
+                    "Redis operation limiter saturated"
+                );
+                ApiError::too_many_requests("Redis operation capacity exhausted")
+            })?
+            .map_err(|error| {
+                error!(%error, target = %task_id, "Redis operation limiter closed");
+                ApiError::unavailable("Redis backend unavailable")
+            })?;
 
         let connection = target.connection().await.map_err(|error| {
             error!(%error, target = %task_id, "Redis connection failed");

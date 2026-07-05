@@ -45,6 +45,13 @@ impl ApiError {
             message: message.into(),
         }
     }
+
+    pub(crate) fn response_too_large(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message: message.into(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
