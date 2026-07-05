@@ -286,7 +286,7 @@ test('Test(@upstash/redis): connection-state commands are rejected before execut
   assert.ok(result.error)
 })
 
-test('Test(@upstash/redis): upstash ratelimit fixed window', async (t) => {
+test('Test(@upstash/ratelimit): upstash ratelimit fixed window', async (t) => {
   if (await ratelimitDisabled(t)) {
     return
   }
@@ -317,7 +317,7 @@ test('Test(@upstash/redis): upstash ratelimit fixed window', async (t) => {
   assert.equal(third.remaining, 0)
 })
 
-test('Test(@upstash/redis): upstash ratelimit fallback', async (t) => {
+test('Test(@upstash/ratelimit): upstash ratelimit fallback', async (t) => {
   if (await scriptFlushDisabled(t)) {
     return
   }
