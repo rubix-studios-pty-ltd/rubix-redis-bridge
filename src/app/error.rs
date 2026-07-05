@@ -46,9 +46,9 @@ impl ApiError {
         }
     }
 
-    pub(crate) fn too_large(message: impl Into<String>) -> Self {
+    pub(crate) fn response_too_large(message: impl Into<String>) -> Self {
         Self {
-            status: StatusCode::PAYLOAD_TOO_LARGE,
+            status: StatusCode::BAD_GATEWAY,
             message: message.into(),
         }
     }

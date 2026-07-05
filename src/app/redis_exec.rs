@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use redis::aio::ConnectionManager;
-use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::time::timeout;
 use tracing::{error, warn};
@@ -22,7 +21,6 @@ pub(crate) async fn execute_command(
     base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
-    max_response_bytes: usize,
     metrics: Metrics,
 ) -> Result<Value, ApiError> {
     execute_operation(
@@ -45,7 +43,6 @@ pub(crate) async fn execute_command(
             result
                 .map(|value| encode_value(value, base64_encoding))
                 .map_err(redis_api_error)
-                .and_then(|value| response_size(value, max_response_bytes))
         },
     )
     .await
@@ -57,7 +54,6 @@ pub(crate) async fn execute_pipeline(
     base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
-    max_response_bytes: usize,
     metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     execute_operation(
@@ -88,7 +84,6 @@ pub(crate) async fn execute_pipeline(
                         .collect()
                 })
                 .map_err(redis_api_error)
-                .and_then(|value| response_size(value, max_response_bytes))
         },
     )
     .await
@@ -100,7 +95,6 @@ pub(crate) async fn execute_transaction(
     base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
-    max_response_bytes: usize,
     metrics: Metrics,
 ) -> Result<Vec<Value>, ApiError> {
     execute_operation(
@@ -126,7 +120,6 @@ pub(crate) async fn execute_transaction(
                         .collect()
                 })
                 .map_err(redis_api_error)
-                .and_then(|value| response_size(value, max_response_bytes))
         },
     )
     .await
@@ -207,21 +200,4 @@ fn append_commands(pipe: &mut redis::Pipeline, commands: Vec<RedisCommand>) {
             pipe.arg(arg.as_slice());
         }
     }
-}
-
-fn response_size<T>(value: T, max_response_bytes: usize) -> Result<T, ApiError>
-where
-    T: Serialize,
-{
-    let encoded_size = serde_json::to_vec(&value)
-        .map_err(|_| ApiError::unavailable("Failed to encode Redis response"))?
-        .len();
-
-    if encoded_size > max_response_bytes {
-        return Err(ApiError::too_large(format!(
-            "Redis response is too large. Maximum allowed bytes: {max_response_bytes}."
-        )));
-    }
-
-    Ok(value)
 }

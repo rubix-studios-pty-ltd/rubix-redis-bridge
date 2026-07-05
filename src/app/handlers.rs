@@ -14,7 +14,7 @@ use crate::security::CommandArg;
 
 use super::error::ApiError;
 use super::redis_exec::{execute_command, execute_pipeline, execute_transaction};
-use super::response::json_response;
+use super::response::{json_response, limited_json_response};
 use super::state::AppState;
 
 pub async fn root() -> impl IntoResponse {
@@ -42,6 +42,20 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
             "target_count": state.target_count()
         }),
     )
+}
+
+fn response_or_denied(
+    state: &AppState,
+    route: &str,
+    result: Result<Response, ApiError>,
+) -> Response {
+    match result {
+        Ok(response) => response,
+        Err(error) => {
+            state.metrics().request_denied(route, "response_too_large");
+            error.into_response()
+        }
+    }
 }
 
 pub async fn metrics(
@@ -112,12 +126,19 @@ pub async fn command(
         base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
-        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await
     {
-        Ok(value) => json_response(StatusCode::OK, json!({ "result": value })),
+        Ok(value) => response_or_denied(
+            &state,
+            "command",
+            limited_json_response(
+                StatusCode::OK,
+                json!({ "result": value }),
+                state.max_response_bytes(),
+            ),
+        ),
         Err(error) => error.into_response(),
     }
 }
@@ -162,12 +183,19 @@ pub async fn pipeline(
         base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
-        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await
     {
-        Ok(response_items) => json_response(StatusCode::OK, Value::Array(response_items)),
+        Ok(response_items) => response_or_denied(
+            &state,
+            "pipeline",
+            limited_json_response(
+                StatusCode::OK,
+                Value::Array(response_items),
+                state.max_response_bytes(),
+            ),
+        ),
         Err(error) => error.into_response(),
     }
 }
@@ -212,7 +240,6 @@ pub async fn multi_exec(
         base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
-        state.max_response_bytes(),
         state.metrics().clone(),
     )
     .await
@@ -223,7 +250,15 @@ pub async fn multi_exec(
                 .map(|value| json!({ "result": value }))
                 .collect();
 
-            json_response(StatusCode::OK, Value::Array(response_items))
+            response_or_denied(
+                &state,
+                "multi_exec",
+                limited_json_response(
+                    StatusCode::OK,
+                    Value::Array(response_items),
+                    state.max_response_bytes(),
+                ),
+            )
         }
         Err(error) => error.into_response(),
     }

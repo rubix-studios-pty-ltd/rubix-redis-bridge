@@ -174,6 +174,10 @@ impl BridgeConfig {
             bail!("RRB_ACQUIRE_TIMEOUT_MS must be greater than zero");
         }
 
+        if acquire_timeout_ms >= request_timeout_ms {
+            bail!("RRB_ACQUIRE_TIMEOUT_MS must be less than RRB_REQUEST_TIMEOUT_MS");
+        }
+
         if max_response_bytes == 0 {
             bail!("RRB_MAX_RESPONSE_BYTES must be greater than zero");
         }
