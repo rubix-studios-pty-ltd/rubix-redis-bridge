@@ -1,3 +1,14 @@
+## [0.3.3] - 2026-07-05
+
+### 🚜 Refactor
+
+- Restructure Redis response handling and serialization
+- Unify Redis value handling across modules
+
+### ⚙️ Miscellaneous Tasks
+
+- Update package manager and reorder devDependencies
+- Update dependencies and improve Redis response handling
 ## [0.3.2] - 2026-07-05
 
 ### 🚀 Features
