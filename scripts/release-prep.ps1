@@ -6,39 +6,49 @@ if (-not $env:NEW_VERSION) {
 
 $version = $env:NEW_VERSION
 $tag = "v$version"
+$dryRun = $env:DRY_RUN -eq "true"
 
-if (Test-Path "package.json") {
-    npm version $version --no-git-tag-version
-}
-
-if (Test-Path "CHANGELOG.md") {
-    git cliff --unreleased --tag $tag --prepend CHANGELOG.md
-
-    $changelog = Get-Content "CHANGELOG.md" -Raw
-
-    $changelog = $changelog -replace "(\S)\r?\n(##\s+\[?v?\d)", "`$1`r`n`r`n`$2"
-
-    Set-Content "CHANGELOG.md" -Value $changelog -NoNewline
-} else {
-    git cliff --unreleased --tag $tag --output CHANGELOG.md
-
-    $changelog = Get-Content "CHANGELOG.md" -Raw
-    Set-Content "CHANGELOG.md" -Value ($changelog.TrimEnd() + "`r`n") -NoNewline
-}
-
-cargo check --workspace --all-targets
-
-$files = @(
+$releaseFiles = @(
     "Cargo.toml",
     "Cargo.lock",
     "CHANGELOG.md",
     "package.json",
-    "package-lock.json",
-    "npm-shrinkwrap.json"
+    "package-lock.json"
 )
 
-foreach ($file in $files) {
-    if (Test-Path $file) {
-        git add $file
+function Restore-ReleaseFiles {
+    foreach ($file in $releaseFiles) {
+        if (Test-Path $file) {
+            git restore --staged -- $file 2>$null
+            git restore --worktree -- $file 2>$null
+        }
     }
+}
+
+try {
+    cargo check --workspace --all-targets
+
+    if (Test-Path "package.json") {
+        npm version $version --no-git-tag-version
+    }
+
+    if (Test-Path "CHANGELOG.md") {
+        git cliff --unreleased --tag $tag --prepend CHANGELOG.md
+    } else {
+        git cliff --unreleased --tag $tag --output CHANGELOG.md
+    }
+
+    foreach ($file in $releaseFiles) {
+        if (Test-Path $file) {
+            git add $file
+        }
+    }
+
+    if ($dryRun) {
+        Restore-ReleaseFiles
+    }
+}
+catch {
+    Restore-ReleaseFiles
+    throw
 }
