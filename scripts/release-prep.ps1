@@ -6,6 +6,13 @@ if (-not $env:NEW_VERSION) {
 
 $version = $env:NEW_VERSION
 $tag = "v$version"
+$isDryRun = $env:DRY_RUN -eq "true"
+
+if ($isDryRun) {
+    Write-Host "cSkipping release file mutations."
+    cargo check --workspace --all-targets
+    exit 0
+}
 
 if (Test-Path "package.json") {
     npm version $version --no-git-tag-version
@@ -15,7 +22,6 @@ if (Test-Path "CHANGELOG.md") {
     git cliff --unreleased --tag $tag --prepend CHANGELOG.md
 
     $changelog = Get-Content "CHANGELOG.md" -Raw
-
     $changelog = $changelog -replace "(\S)\r?\n(##\s+\[?v?\d)", "`$1`r`n`r`n`$2"
 
     Set-Content "CHANGELOG.md" -Value $changelog -NoNewline
