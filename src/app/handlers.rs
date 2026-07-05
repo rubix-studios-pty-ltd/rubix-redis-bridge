@@ -6,7 +6,7 @@ use axum::extract::{ConnectInfo, Json, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use serde_json::{Value, json};
+use serde_json::json;
 use tracing::error;
 
 use crate::metrics::Metrics;
@@ -14,7 +14,8 @@ use crate::security::CommandArg;
 
 use super::error::ApiError;
 use super::redis_exec::{execute_command, execute_pipeline, execute_transaction};
-use super::response::{json_response, limited_json_response};
+use super::redis_response::{CommandResponse, PipelineResponse, TransactionResponse};
+use super::response::{json_response, serialized_response};
 use super::state::AppState;
 
 pub async fn root() -> impl IntoResponse {
@@ -123,7 +124,6 @@ pub async fn command(
     match execute_command(
         target,
         command,
-        base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
         state.metrics().clone(),
@@ -133,9 +133,12 @@ pub async fn command(
         Ok(value) => response_or_denied(
             &state,
             "command",
-            limited_json_response(
+            serialized_response(
                 StatusCode::OK,
-                json!({ "result": value }),
+                &CommandResponse {
+                    result: &value,
+                    base64_encoding,
+                },
                 state.max_response_bytes(),
             ),
         ),
@@ -180,7 +183,6 @@ pub async fn pipeline(
     match execute_pipeline(
         target,
         commands,
-        base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
         state.metrics().clone(),
@@ -190,9 +192,12 @@ pub async fn pipeline(
         Ok(response_items) => response_or_denied(
             &state,
             "pipeline",
-            limited_json_response(
+            serialized_response(
                 StatusCode::OK,
-                Value::Array(response_items),
+                &PipelineResponse {
+                    items: &response_items,
+                    base64_encoding,
+                },
                 state.max_response_bytes(),
             ),
         ),
@@ -237,29 +242,24 @@ pub async fn multi_exec(
     match execute_transaction(
         target,
         commands,
-        base64_encoding,
         state.request_timeout(),
         state.acquire_timeout(),
         state.metrics().clone(),
     )
     .await
     {
-        Ok(values) => {
-            let response_items = values
-                .into_iter()
-                .map(|value| json!({ "result": value }))
-                .collect();
-
-            response_or_denied(
-                &state,
-                "multi_exec",
-                limited_json_response(
-                    StatusCode::OK,
-                    Value::Array(response_items),
-                    state.max_response_bytes(),
-                ),
-            )
-        }
+        Ok(values) => response_or_denied(
+            &state,
+            "multi_exec",
+            serialized_response(
+                StatusCode::OK,
+                &TransactionResponse {
+                    values: &values,
+                    base64_encoding,
+                },
+                state.max_response_bytes(),
+            ),
+        ),
         Err(error) => error.into_response(),
     }
 }

@@ -2,8 +2,8 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use redis::Value as RedisValue;
 use redis::aio::ConnectionManager;
-use serde_json::{Value, json};
 use tokio::time::timeout;
 use tracing::{error, warn};
 
@@ -12,17 +12,20 @@ use crate::security::RedisCommand;
 
 use super::error::ApiError;
 use super::redis_error::{redis_api_error, redis_error_message};
-use super::redis_value::encode_value;
 use super::state::RedisTarget;
+
+pub(crate) enum RedisResponseItem {
+    Result(RedisValue),
+    Error(String),
+}
 
 pub(crate) async fn execute_command(
     target: Arc<RedisTarget>,
     command: RedisCommand,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Value, ApiError> {
+) -> Result<RedisValue, ApiError> {
     execute_operation(
         target,
         "command",
@@ -37,12 +40,10 @@ pub(crate) async fn execute_command(
                 redis_command.arg(arg.as_slice());
             }
 
-            let result: redis::RedisResult<redis::Value> =
+            let result: redis::RedisResult<RedisValue> =
                 redis_command.query_async(&mut connection).await;
 
-            result
-                .map(|value| encode_value(value, base64_encoding))
-                .map_err(redis_api_error)
+            result.map_err(redis_api_error)
         },
     )
     .await
@@ -51,11 +52,10 @@ pub(crate) async fn execute_command(
 pub(crate) async fn execute_pipeline(
     target: Arc<RedisTarget>,
     commands: Vec<RedisCommand>,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Vec<Value>, ApiError> {
+) -> Result<Vec<RedisResponseItem>, ApiError> {
     execute_operation(
         target,
         "pipeline",
@@ -66,7 +66,8 @@ pub(crate) async fn execute_pipeline(
         move |mut connection| async move {
             let mut pipe = redis::pipe();
             append_commands(&mut pipe, commands);
-            let result: redis::RedisResult<Vec<redis::RedisResult<redis::Value>>> =
+
+            let result: redis::RedisResult<Vec<redis::RedisResult<RedisValue>>> =
                 pipe.ignore_errors().query_async(&mut connection).await;
 
             result
@@ -74,12 +75,8 @@ pub(crate) async fn execute_pipeline(
                     items
                         .into_iter()
                         .map(|item| match item {
-                            Ok(value) => json!({
-                                "result": encode_value(value, base64_encoding)
-                            }),
-                            Err(error) => json!({
-                                "error": redis_error_message(&error)
-                            }),
+                            Ok(value) => RedisResponseItem::Result(value),
+                            Err(error) => RedisResponseItem::Error(redis_error_message(&error)),
                         })
                         .collect()
                 })
@@ -92,11 +89,10 @@ pub(crate) async fn execute_pipeline(
 pub(crate) async fn execute_transaction(
     target: Arc<RedisTarget>,
     commands: Vec<RedisCommand>,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Vec<Value>, ApiError> {
+) -> Result<Vec<RedisValue>, ApiError> {
     execute_operation(
         target,
         "multi_exec",
@@ -109,17 +105,10 @@ pub(crate) async fn execute_transaction(
             pipe.atomic();
             append_commands(&mut pipe, commands);
 
-            let result: redis::RedisResult<Vec<redis::Value>> =
+            let result: redis::RedisResult<Vec<RedisValue>> =
                 pipe.query_async(&mut connection).await;
 
-            result
-                .map(|values| {
-                    values
-                        .into_iter()
-                        .map(|value| encode_value(value, base64_encoding))
-                        .collect()
-                })
-                .map_err(redis_api_error)
+            result.map_err(redis_api_error)
         },
     )
     .await

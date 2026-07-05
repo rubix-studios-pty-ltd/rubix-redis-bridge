@@ -1,29 +1,38 @@
 use std::io::{self, Write};
 
+use axum::body::Body;
 use axum::extract::Json;
 use axum::http::StatusCode;
+use axum::http::header::CONTENT_TYPE;
 use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 use serde_json::Value;
 
 use super::error::ApiError;
 
-struct SizeLimitWriter {
+struct LimitBody {
+    body: Vec<u8>,
     written: usize,
     max: usize,
     exceeded: bool,
 }
 
-impl SizeLimitWriter {
+impl LimitBody {
     fn new(max: usize) -> Self {
         Self {
+            body: Vec::new(),
             written: 0,
             max,
             exceeded: false,
         }
     }
+
+    fn into_body(self) -> Vec<u8> {
+        self.body
+    }
 }
 
-impl Write for SizeLimitWriter {
+impl Write for LimitBody {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.len() > self.max.saturating_sub(self.written) {
             self.exceeded = true;
@@ -33,6 +42,7 @@ impl Write for SizeLimitWriter {
         }
 
         self.written += buf.len();
+        self.body.extend_from_slice(buf);
         Ok(buf.len())
     }
 
@@ -45,21 +55,23 @@ pub(crate) fn json_response(status: StatusCode, value: Value) -> Response {
     (status, Json(value)).into_response()
 }
 
-pub(crate) fn limited_json_response(
+pub(crate) fn serialized_response<T>(
     status: StatusCode,
-    value: Value,
+    value: &T,
     max_response_bytes: usize,
-) -> Result<Response, ApiError> {
-    validate_json_response_size(&value, max_response_bytes)?;
-
-    Ok(json_response(status, value))
-}
-
-fn validate_json_response_size(value: &Value, max_response_bytes: usize) -> Result<(), ApiError> {
-    let mut writer = SizeLimitWriter::new(max_response_bytes);
+) -> Result<Response, ApiError>
+where
+    T: Serialize,
+{
+    let mut writer = LimitBody::new(max_response_bytes);
 
     match serde_json::to_writer(&mut writer, value) {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok((
+            status,
+            [(CONTENT_TYPE, "application/json")],
+            Body::from(writer.into_body()),
+        )
+            .into_response()),
         Err(_) if writer.exceeded => Err(ApiError::response_too_large(format!(
             "Redis response is too large. Maximum allowed bytes: {max_response_bytes}."
         ))),

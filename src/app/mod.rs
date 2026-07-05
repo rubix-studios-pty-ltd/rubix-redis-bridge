@@ -4,6 +4,7 @@ mod handlers;
 mod lockout;
 mod redis_error;
 mod redis_exec;
+mod redis_response;
 mod redis_value;
 mod response;
 mod state;

@@ -1,172 +1,319 @@
 use base64::Engine;
 use redis::Value as RedisValue;
-use serde_json::{Map, Number, Value, json};
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Serialize, Serializer};
 use tracing::warn;
 
-pub fn encode_value(value: RedisValue, base64_encoding: bool) -> Value {
+pub(crate) struct RedisJson<'a> {
+    value: &'a RedisValue,
+    base64_encoding: bool,
+}
+
+impl<'a> RedisJson<'a> {
+    pub(crate) fn new(value: &'a RedisValue, base64_encoding: bool) -> Self {
+        Self {
+            value,
+            base64_encoding,
+        }
+    }
+}
+
+impl Serialize for RedisJson<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serialize_redis(self.value, self.base64_encoding, serializer)
+    }
+}
+
+fn serialize_redis<S>(
+    value: &RedisValue,
+    base64_encoding: bool,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
     match value {
-        RedisValue::Nil => Value::Null,
-        RedisValue::Int(value) => json!(value),
-        RedisValue::BulkString(value) => encode_bytes(value, base64_encoding),
-        RedisValue::Array(values) => encode_array(values, base64_encoding),
-        RedisValue::SimpleString(value) => encode_string(value, base64_encoding),
-        RedisValue::Okay => json!("OK"),
+        RedisValue::Nil => serializer.serialize_none(),
+        RedisValue::Int(value) => serializer.serialize_i64(*value),
+        RedisValue::BulkString(bytes) => serialize_bytes(bytes, base64_encoding, serializer),
+        RedisValue::Array(values) => serialize_array(values, base64_encoding, serializer),
+        RedisValue::SimpleString(value) => serialize_string(value, base64_encoding, serializer),
+        RedisValue::Okay => serializer.serialize_str("OK"),
+        RedisValue::Map(entries) => serialize_map(entries, base64_encoding, serializer),
+        RedisValue::Set(values) => serialize_array(values, base64_encoding, serializer),
+        RedisValue::Double(value) => serialize_f64(*value, serializer),
+        RedisValue::Boolean(value) => serializer.serialize_bool(*value),
+        RedisValue::BigNumber(value) => serializer.serialize_str(&value.to_string()),
 
-        RedisValue::Map(entries) => encode_map(entries, base64_encoding),
+        RedisValue::Attribute { data, attributes } => {
+            let mut map = serializer.serialize_map(Some(3))?;
+            map.serialize_entry("type", "attribute")?;
+            map.serialize_entry("data", &RedisJson::new(data, base64_encoding))?;
+            map.serialize_entry("attributes", &RedisMap::new(attributes, base64_encoding))?;
+            map.end()
+        }
 
-        RedisValue::Attribute { data, attributes } => json!({
-            "type": "attribute",
-            "data": encode_value(*data, base64_encoding),
-            "attributes": encode_map(attributes, base64_encoding),
-        }),
+        RedisValue::VerbatimString { format, text } => {
+            let mut map = serializer.serialize_map(Some(3))?;
+            map.serialize_entry("type", "verbatim_string")?;
+            map.serialize_entry("format", &format!("{format:?}"))?;
+            map.serialize_entry("value", text)?;
+            map.end()
+        }
 
-        RedisValue::Set(values) => Value::Array(
-            values
-                .into_iter()
-                .map(|value| encode_value(value, base64_encoding))
-                .collect(),
-        ),
+        RedisValue::Push { kind, data } => {
+            let mut map = serializer.serialize_map(Some(3))?;
+            map.serialize_entry("type", "push")?;
+            map.serialize_entry("kind", &format!("{kind:?}"))?;
+            map.serialize_entry("data", &RedisArray::new(data, base64_encoding))?;
+            map.end()
+        }
 
-        RedisValue::Double(value) => encode_f64(value),
-        RedisValue::Boolean(value) => json!(value),
-
-        RedisValue::VerbatimString { format, text } => json!({
-            "type": "verbatim_string",
-            "format": format!("{format:?}"),
-            "value": text,
-        }),
-
-        RedisValue::BigNumber(value) => encode_big_number(value),
-
-        RedisValue::Push { kind, data } => json!({
-            "type": "push",
-            "kind": format!("{kind:?}"),
-            "data": encode_array(data, base64_encoding),
-        }),
-
-        RedisValue::ServerError(error) => json!({
-            "type": "server_error",
-            "error": error.to_string(),
-        }),
+        RedisValue::ServerError(error) => {
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry("type", "server_error")?;
+            map.serialize_entry("error", &error.to_string())?;
+            map.end()
+        }
 
         _ => {
             warn!("unsupported RedisValue variant encountered");
 
-            json!({
-                "type": "unsupported_redis_value",
-            })
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry("type", "unsupported_redis_value")?;
+            map.end()
         }
     }
 }
 
-fn encode_array(values: Vec<RedisValue>, base64_encoding: bool) -> Value {
-    Value::Array(
-        values
-            .into_iter()
-            .map(|value| encode_value(value, base64_encoding))
-            .collect(),
-    )
-}
-
-fn encode_map(entries: Vec<(RedisValue, RedisValue)>, base64_encoding: bool) -> Value {
-    if can_encode_object(&entries, base64_encoding) {
-        return Value::Object(encode_object(entries, base64_encoding));
+fn serialize_f64<S>(value: f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if value.is_finite() {
+        return serializer.serialize_f64(value);
     }
 
-    let pairs = entries
-        .into_iter()
-        .map(|(key, value)| {
-            Value::Array(vec![
-                encode_value(key, base64_encoding),
-                encode_value(value, base64_encoding),
-            ])
-        })
-        .collect::<Vec<_>>();
-
-    json!({
-        "type": "map",
-        "value": pairs,
-    })
+    let mut map = serializer.serialize_map(Some(2))?;
+    map.serialize_entry("type", "double")?;
+    map.serialize_entry("value", &value.to_string())?;
+    map.end()
 }
 
-fn can_encode_object(entries: &[(RedisValue, RedisValue)], base64_encoding: bool) -> bool {
-    let mut keys = std::collections::HashSet::with_capacity(entries.len());
+fn serialize_bytes<S>(bytes: &[u8], base64_encoding: bool, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if base64_encoding {
+        return serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes));
+    }
+
+    match std::str::from_utf8(bytes) {
+        Ok(value) => serializer.serialize_str(value),
+        Err(_) => {
+            let mut map = serializer.serialize_map(Some(3))?;
+            map.serialize_entry("type", "binary")?;
+            map.serialize_entry("encoding", "base64")?;
+            map.serialize_entry(
+                "value",
+                &base64::engine::general_purpose::STANDARD.encode(bytes),
+            )?;
+            map.end()
+        }
+    }
+}
+
+fn serialize_string<S>(value: &str, base64_encoding: bool, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if base64_encoding && value != "OK" {
+        return serializer
+            .serialize_str(&base64::engine::general_purpose::STANDARD.encode(value.as_bytes()));
+    }
+
+    serializer.serialize_str(value)
+}
+
+struct RedisArray<'a> {
+    values: &'a [RedisValue],
+    base64_encoding: bool,
+}
+
+impl<'a> RedisArray<'a> {
+    fn new(values: &'a [RedisValue], base64_encoding: bool) -> Self {
+        Self {
+            values,
+            base64_encoding,
+        }
+    }
+}
+
+impl Serialize for RedisArray<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serialize_array(self.values, self.base64_encoding, serializer)
+    }
+}
+
+fn serialize_array<S>(
+    values: &[RedisValue],
+    base64_encoding: bool,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(values.len()))?;
+
+    for value in values {
+        seq.serialize_element(&RedisJson::new(value, base64_encoding))?;
+    }
+
+    seq.end()
+}
+
+struct RedisMap<'a> {
+    entries: &'a [(RedisValue, RedisValue)],
+    base64_encoding: bool,
+}
+
+impl<'a> RedisMap<'a> {
+    fn new(entries: &'a [(RedisValue, RedisValue)], base64_encoding: bool) -> Self {
+        Self {
+            entries,
+            base64_encoding,
+        }
+    }
+}
+
+impl Serialize for RedisMap<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serialize_map(self.entries, self.base64_encoding, serializer)
+    }
+}
+
+fn serialize_map<S>(
+    entries: &[(RedisValue, RedisValue)],
+    base64_encoding: bool,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(keys) = object_keys(entries, base64_encoding) {
+        let mut map = serializer.serialize_map(Some(entries.len()))?;
+
+        for ((_, value), key) in entries.iter().zip(keys) {
+            map.serialize_entry(&key, &RedisJson::new(value, base64_encoding))?;
+        }
+
+        return map.end();
+    }
+
+    let mut map = serializer.serialize_map(Some(2))?;
+    map.serialize_entry("type", "map")?;
+    map.serialize_entry("value", &RedisMapPairs::new(entries, base64_encoding))?;
+    map.end()
+}
+
+struct RedisMapPairs<'a> {
+    entries: &'a [(RedisValue, RedisValue)],
+    base64_encoding: bool,
+}
+
+impl<'a> RedisMapPairs<'a> {
+    fn new(entries: &'a [(RedisValue, RedisValue)], base64_encoding: bool) -> Self {
+        Self {
+            entries,
+            base64_encoding,
+        }
+    }
+}
+
+impl Serialize for RedisMapPairs<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.entries.len()))?;
+
+        for (key, value) in self.entries {
+            seq.serialize_element(&RedisPair {
+                key,
+                value,
+                base64_encoding: self.base64_encoding,
+            })?;
+        }
+
+        seq.end()
+    }
+}
+
+struct RedisPair<'a> {
+    key: &'a RedisValue,
+    value: &'a RedisValue,
+    base64_encoding: bool,
+}
+
+impl Serialize for RedisPair<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&RedisJson::new(self.key, self.base64_encoding))?;
+        seq.serialize_element(&RedisJson::new(self.value, self.base64_encoding))?;
+        seq.end()
+    }
+}
+
+fn object_keys(entries: &[(RedisValue, RedisValue)], base64_encoding: bool) -> Option<Vec<String>> {
+    let mut seen = std::collections::HashSet::with_capacity(entries.len());
+    let mut keys = Vec::with_capacity(entries.len());
 
     for (key, _) in entries {
-        let encoded_key = encode_value(key.clone(), base64_encoding);
-        let Some(object_key) = encode_object_key(&encoded_key) else {
-            return false;
-        };
+        let object_key = object_key(key, base64_encoding)?;
 
-        if !keys.insert(object_key) {
-            return false;
+        if !seen.insert(object_key.clone()) {
+            return None;
         }
+
+        keys.push(object_key);
     }
 
-    true
+    Some(keys)
 }
 
-fn encode_object(
-    entries: Vec<(RedisValue, RedisValue)>,
-    base64_encoding: bool,
-) -> Map<String, Value> {
-    entries
-        .into_iter()
-        .filter_map(|(key, value)| {
-            let encoded_key = encode_value(key, base64_encoding);
-            let object_key = encode_object_key(&encoded_key)?;
-            Some((object_key, encode_value(value, base64_encoding)))
-        })
-        .collect()
-}
-
-fn encode_object_key(value: &Value) -> Option<String> {
+fn object_key(value: &RedisValue, base64_encoding: bool) -> Option<String> {
     match value {
-        Value::String(value) => Some(value.clone()),
-        Value::Number(value) => Some(value.to_string()),
-        Value::Bool(value) => Some(value.to_string()),
-        Value::Null => Some("null".to_string()),
-        Value::Array(_) | Value::Object(_) => None,
-    }
-}
+        RedisValue::Nil => Some("null".to_string()),
+        RedisValue::Int(value) => Some(value.to_string()),
+        RedisValue::Boolean(value) => Some(value.to_string()),
+        RedisValue::SimpleString(value) => {
+            if base64_encoding && value != "OK" {
+                return Some(base64::engine::general_purpose::STANDARD.encode(value.as_bytes()));
+            }
 
-fn encode_f64(value: f64) -> Value {
-    match Number::from_f64(value) {
-        Some(number) => Value::Number(number),
-        None => json!({
-            "type": "double",
-            "value": value.to_string(),
-        }),
-    }
-}
-
-fn encode_big_number(value: impl ToString) -> Value {
-    json!(value.to_string())
-}
-
-fn encode_bytes(bytes: Vec<u8>, base64_encoding: bool) -> Value {
-    if base64_encoding {
-        return json!(base64::engine::general_purpose::STANDARD.encode(&bytes));
-    }
-
-    match String::from_utf8(bytes) {
-        Ok(value) => json!(value),
-        Err(error) => {
-            let bytes = error.into_bytes();
-
-            json!({
-                "type": "binary",
-                "encoding": "base64",
-                "value": base64::engine::general_purpose::STANDARD.encode(&bytes),
-            })
+            Some(value.clone())
         }
-    }
-}
+        RedisValue::BulkString(bytes) => {
+            if base64_encoding {
+                return Some(base64::engine::general_purpose::STANDARD.encode(bytes));
+            }
 
-fn encode_string(value: String, base64_encoding: bool) -> Value {
-    if base64_encoding && value != "OK" {
-        return json!(base64::engine::general_purpose::STANDARD.encode(value.as_bytes()));
+            std::str::from_utf8(bytes).ok().map(ToOwned::to_owned)
+        }
+        RedisValue::BigNumber(value) => Some(value.to_string()),
+        RedisValue::Double(value) if value.is_finite() => Some(value.to_string()),
+        _ => None,
     }
-
-    json!(value)
 }
