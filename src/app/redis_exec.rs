@@ -2,8 +2,8 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use redis::Value;
 use redis::aio::ConnectionManager;
-use serde_json::{Value, json};
 use tokio::time::timeout;
 use tracing::{error, warn};
 
@@ -12,13 +12,12 @@ use crate::security::RedisCommand;
 
 use super::error::ApiError;
 use super::redis_error::{redis_api_error, redis_error_message};
-use super::redis_value::encode_value;
+use super::redis_response::RedisResponse;
 use super::state::RedisTarget;
 
 pub(crate) async fn execute_command(
     target: Arc<RedisTarget>,
     command: RedisCommand,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
@@ -37,12 +36,10 @@ pub(crate) async fn execute_command(
                 redis_command.arg(arg.as_slice());
             }
 
-            let result: redis::RedisResult<redis::Value> =
+            let result: redis::RedisResult<Value> =
                 redis_command.query_async(&mut connection).await;
 
-            result
-                .map(|value| encode_value(value, base64_encoding))
-                .map_err(redis_api_error)
+            result.map_err(redis_api_error)
         },
     )
     .await
@@ -51,11 +48,10 @@ pub(crate) async fn execute_command(
 pub(crate) async fn execute_pipeline(
     target: Arc<RedisTarget>,
     commands: Vec<RedisCommand>,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Vec<Value>, ApiError> {
+) -> Result<Vec<RedisResponse>, ApiError> {
     execute_operation(
         target,
         "pipeline",
@@ -66,7 +62,8 @@ pub(crate) async fn execute_pipeline(
         move |mut connection| async move {
             let mut pipe = redis::pipe();
             append_commands(&mut pipe, commands);
-            let result: redis::RedisResult<Vec<redis::RedisResult<redis::Value>>> =
+
+            let result: redis::RedisResult<Vec<redis::RedisResult<Value>>> =
                 pipe.ignore_errors().query_async(&mut connection).await;
 
             result
@@ -74,12 +71,8 @@ pub(crate) async fn execute_pipeline(
                     items
                         .into_iter()
                         .map(|item| match item {
-                            Ok(value) => json!({
-                                "result": encode_value(value, base64_encoding)
-                            }),
-                            Err(error) => json!({
-                                "error": redis_error_message(&error)
-                            }),
+                            Ok(value) => RedisResponse::Result(value),
+                            Err(error) => RedisResponse::Error(redis_error_message(&error)),
                         })
                         .collect()
                 })
@@ -92,7 +85,6 @@ pub(crate) async fn execute_pipeline(
 pub(crate) async fn execute_transaction(
     target: Arc<RedisTarget>,
     commands: Vec<RedisCommand>,
-    base64_encoding: bool,
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
@@ -109,17 +101,9 @@ pub(crate) async fn execute_transaction(
             pipe.atomic();
             append_commands(&mut pipe, commands);
 
-            let result: redis::RedisResult<Vec<redis::Value>> =
-                pipe.query_async(&mut connection).await;
+            let result: redis::RedisResult<Vec<Value>> = pipe.query_async(&mut connection).await;
 
-            result
-                .map(|values| {
-                    values
-                        .into_iter()
-                        .map(|value| encode_value(value, base64_encoding))
-                        .collect()
-                })
-                .map_err(redis_api_error)
+            result.map_err(redis_api_error)
         },
     )
     .await
