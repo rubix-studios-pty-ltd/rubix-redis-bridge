@@ -11,3 +11,12 @@ mod state;
 
 pub use handlers::{command, healthz, metrics, multi_exec, pipeline, readyz, root};
 pub use state::AppState;
+
+#[cfg(test)]
+mod redis_value_tests;
+
+#[cfg(test)]
+mod redis_response_tests;
+
+#[cfg(test)]
+mod response_tests;

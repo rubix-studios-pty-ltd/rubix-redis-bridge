@@ -2,8 +2,12 @@ use redis::Value as RedisValue;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
-use super::redis_exec::RedisResponseItem;
 use super::redis_value::RedisJson;
+
+pub(crate) enum RedisResponse {
+    Result(RedisValue),
+    Error(String),
+}
 
 pub(crate) struct CommandResponse<'a> {
     pub(crate) result: &'a RedisValue,
@@ -22,7 +26,7 @@ impl Serialize for CommandResponse<'_> {
 }
 
 pub(crate) struct PipelineResponse<'a> {
-    pub(crate) items: &'a [RedisResponseItem],
+    pub(crate) items: &'a [RedisResponse],
     pub(crate) base64_encoding: bool,
 }
 
@@ -45,7 +49,7 @@ impl Serialize for PipelineResponse<'_> {
 }
 
 struct PipelineItem<'a> {
-    item: &'a RedisResponseItem,
+    item: &'a RedisResponse,
     base64_encoding: bool,
 }
 
@@ -55,12 +59,12 @@ impl Serialize for PipelineItem<'_> {
         S: Serializer,
     {
         match self.item {
-            RedisResponseItem::Result(value) => {
+            RedisResponse::Result(value) => {
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry("result", &RedisJson::new(value, self.base64_encoding))?;
                 map.end()
             }
-            RedisResponseItem::Error(error) => {
+            RedisResponse::Error(error) => {
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry("error", error)?;
                 map.end()

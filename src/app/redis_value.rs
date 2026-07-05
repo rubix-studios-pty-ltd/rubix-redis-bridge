@@ -313,7 +313,9 @@ fn object_key(value: &RedisValue, base64_encoding: bool) -> Option<String> {
             std::str::from_utf8(bytes).ok().map(ToOwned::to_owned)
         }
         RedisValue::BigNumber(value) => Some(value.to_string()),
-        RedisValue::Double(value) if value.is_finite() => Some(value.to_string()),
+        RedisValue::Double(value) if value.is_finite() => {
+            serde_json::Number::from_f64(*value).map(|number| number.to_string())
+        }
         _ => None,
     }
 }

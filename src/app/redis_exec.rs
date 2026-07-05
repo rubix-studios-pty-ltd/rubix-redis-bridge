@@ -12,12 +12,8 @@ use crate::security::RedisCommand;
 
 use super::error::ApiError;
 use super::redis_error::{redis_api_error, redis_error_message};
+use super::redis_response::RedisResponse;
 use super::state::RedisTarget;
-
-pub(crate) enum RedisResponseItem {
-    Result(RedisValue),
-    Error(String),
-}
 
 pub(crate) async fn execute_command(
     target: Arc<RedisTarget>,
@@ -55,7 +51,7 @@ pub(crate) async fn execute_pipeline(
     request_timeout: Duration,
     acquire_timeout: Duration,
     metrics: Metrics,
-) -> Result<Vec<RedisResponseItem>, ApiError> {
+) -> Result<Vec<RedisResponse>, ApiError> {
     execute_operation(
         target,
         "pipeline",
@@ -75,8 +71,8 @@ pub(crate) async fn execute_pipeline(
                     items
                         .into_iter()
                         .map(|item| match item {
-                            Ok(value) => RedisResponseItem::Result(value),
-                            Err(error) => RedisResponseItem::Error(redis_error_message(&error)),
+                            Ok(value) => RedisResponse::Result(value),
+                            Err(error) => RedisResponse::Error(redis_error_message(&error)),
                         })
                         .collect()
                 })
