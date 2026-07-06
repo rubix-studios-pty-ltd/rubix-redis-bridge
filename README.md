@@ -71,7 +71,7 @@ Expected response:
 
 ## API
 
-Rubix Redis Bridge implements the Redis HTTP command flow used by `@upstash/redis` for supported commands, while enforcing bridge-level authentication, command policy, and runtime limits.
+Rubix Redis Bridge implements the Redis HTTP command flow used by `@upstash/redis` for supported commands, while enforcing bridge-level authentication, policy, and limits.
 
 Available commands are controlled by `RRB_ALLOWED_COMMANDS`. Unsupported or blocked commands are rejected before Redis execution.
 
@@ -127,17 +127,6 @@ Use `POST /multi-exec` for managed transactions. Raw `MULTI`, `EXEC`, `WATCH`, `
 
 Rubix Redis Bridge has been tested with `@upstash/redis` across the supported command surface, including single commands, pipelines, managed transactions, and pipeline error handling.
 
-Confirmed paths:
-
-```txt
-redis.set()
-redis.get()
-redis.ping()
-redis.pipeline().exec()
-redis.multi().exec()
-pipeline.exec({ keepErrors: true })
-```
-
 Compatibility depends on the configured allowlist. If the SDK calls a command that is not allowed, the bridge rejects it.
 
 Restricted allowlist example:
@@ -177,7 +166,7 @@ When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy w
 
 `SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
 
-Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weak authenticated callers, or backends that have not passed the bridge Lua/script tests.
+Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weak authenticated callers.
 
 ## Command policy
 
@@ -197,9 +186,7 @@ becomes:
 GET,SET,DEL
 ```
 
-`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands.
-
-Custom config cannot remove default blocks or re-enable hard-denied commands.
+`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands.
 
 ## Hard-denied commands
 
@@ -362,7 +349,7 @@ Health and metrics endpoints support operational monitoring without placing Redi
 
 `GET /healthz` reports process health.
 
-`GET /readyz` reports startup readiness. It confirms that at least one Redis target loaded. It does not ping every Redis backend.
+`GET /readyz` reports startup readiness. It confirms that at least one Redis target loaded.
 
 Backend failures are returned per command as `503`.
 
@@ -466,15 +453,16 @@ Rubix Redis Bridge should be deployed as a private infrastructure service with t
 
 Recommended:
 
-- Require a long random RRB_TOKEN
-- Enable require Redis auth
-- Narrow command access
-- Lower body limits
-- Add reverse proxy
-- Add rate limits
-- Add IP restrictions
-- Monitor failures
-- Avoid direct Redis
+- Random hex values for RRB_TOKEN
+- Random hex values for RRB_METRICS_TOKEN
+- Enable Redis authentication
+- Narrow command access to the minimum required command set
+- Lower request body limits where possible
+- Place the bridge behind a reverse proxy
+- Apply reverse proxy rate limits
+- Restrict access by trusted IP ranges or private networking
+- Monitor authentication failures, denied commands, lockouts, and latency
+- Avoid exposing the Redis server directly to public networks
 
 ## License
 
