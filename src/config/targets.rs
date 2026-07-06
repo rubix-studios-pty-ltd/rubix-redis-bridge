@@ -38,7 +38,7 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
         parse_env_first(&["RRB_CONNECTION_SHARDS"], default_connection_shards())?;
 
     if operation_limit == 0 {
-        bail!("RRB_REDIS_OPERATION_LIMIT must be greater than zero");
+        bail!("RRB_OPERATION_LIMIT must be greater than zero");
     }
 
     if connection_shards == 0 {
@@ -148,7 +148,7 @@ fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Ve
         }
 
         if target.operation_limit == 0 {
-            bail!("Token config file contains redis_operation_limit=0 for target {rrb_id}");
+            bail!("Token config file contains operation_limit=0 for target {rrb_id}");
         }
 
         if target.connection_shards == 0 {

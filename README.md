@@ -251,7 +251,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 
 `RRB_OPERATION_LIMIT` limits the number of Redis operations that may be in flight for a single Redis target. This is the per-target admission-control and backpressure limit.
 
-`RRB_REDIS_CONNECTION_SHARDS` controls how many Redis ConnectionManager instances are created lazily per target. Admitted Redis operations are distributed across these shards using round-robin selection. Typical values are 4 to 8. Keep this lower than `RRB_OPERATION_LIMIT`.
+`RRB_CONNECTION_SHARDS` controls how many Redis ConnectionManager instances are created lazily per target. Admitted Redis operations are distributed across these shards using round-robin selection. Typical values are 4 to 8. Keep this lower than `RRB_OPERATION_LIMIT`.
 
 `RRB_ACQUIRE_TIMEOUT_MS` applies backpressure before Redis execution. When the target operation gate is saturated, the bridge rejects quickly with `429` instead of retaining many request bodies while waiting for Redis capacity.
 
