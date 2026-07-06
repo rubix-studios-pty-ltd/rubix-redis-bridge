@@ -15,7 +15,7 @@ use crate::security::CommandArg;
 use super::error::ApiError;
 use super::redis_exec::{execute_command, execute_pipeline, execute_transaction};
 use super::redis_response::{CommandResponse, PipelineResponse, TransactionResponse};
-use super::response::{json_response, serialized_response};
+use super::response::{ResponseError, json_response, serialized_response};
 use super::state::AppState;
 
 pub async fn root() -> impl IntoResponse {
@@ -48,13 +48,13 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
 fn response_or_denied(
     state: &AppState,
     route: &str,
-    result: Result<Response, ApiError>,
+    result: Result<Response, ResponseError>,
 ) -> Response {
     match result {
         Ok(response) => response,
         Err(error) => {
-            state.metrics().request_denied(route, "response_too_large");
-            error.into_response()
+            state.metrics().request_denied(route, error.metric_reason());
+            error.into_api_error().into_response()
         }
     }
 }

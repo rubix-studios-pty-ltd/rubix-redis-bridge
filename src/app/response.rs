@@ -10,6 +10,30 @@ use serde_json::Value;
 
 use super::error::ApiError;
 
+#[derive(Debug)]
+pub(crate) enum ResponseError {
+    TooLarge { max_response_bytes: usize },
+    Encode,
+}
+
+impl ResponseError {
+    pub(crate) fn metric_reason(&self) -> &'static str {
+        match self {
+            Self::TooLarge { .. } => "response_too_large",
+            Self::Encode => "response_encode",
+        }
+    }
+
+    pub(crate) fn into_api_error(self) -> ApiError {
+        match self {
+            Self::TooLarge { max_response_bytes } => ApiError::response_too_large(format!(
+                "Redis response is too large. Maximum allowed bytes: {max_response_bytes}."
+            )),
+            Self::Encode => ApiError::unavailable("Failed to encode Redis response"),
+        }
+    }
+}
+
 struct LimitBody {
     body: Vec<u8>,
     written: usize,
@@ -59,7 +83,7 @@ pub(crate) fn serialized_response<T>(
     status: StatusCode,
     value: &T,
     max_response_bytes: usize,
-) -> Result<Response, ApiError>
+) -> Result<Response, ResponseError>
 where
     T: Serialize,
 {
@@ -72,9 +96,7 @@ where
             Body::from(writer.into_body()),
         )
             .into_response()),
-        Err(_) if writer.exceeded => Err(ApiError::response_too_large(format!(
-            "Redis response is too large. Maximum allowed bytes: {max_response_bytes}."
-        ))),
-        Err(_) => Err(ApiError::unavailable("Failed to encode Redis response")),
+        Err(_) if writer.exceeded => Err(ResponseError::TooLarge { max_response_bytes }),
+        Err(_) => Err(ResponseError::Encode),
     }
 }

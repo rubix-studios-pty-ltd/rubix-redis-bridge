@@ -29,7 +29,7 @@ try {
     cargo check --workspace --all-targets
 
     if (Test-Path "package.json") {
-        npm version $version --no-git-tag-version
+        npm version $version --no-git-tag-version --ignore-scripts
     }
 
     if (Test-Path "CHANGELOG.md") {
