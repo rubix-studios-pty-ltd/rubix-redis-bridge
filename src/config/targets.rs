@@ -31,8 +31,7 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow!("RRB_CONNECTION_STRING or REDIS_URL is required when mode=env"))?;
 
-    let operation_limit =
-        parse_env_first(&["RRB_OPERATION_LIMIT"], default_operation_limit())?;
+    let operation_limit = parse_env_first(&["RRB_OPERATION_LIMIT"], default_operation_limit())?;
 
     let connection_shards =
         parse_env_first(&["RRB_CONNECTION_SHARDS"], default_connection_shards())?;
