@@ -1,16 +1,16 @@
 # Rubix Redis Bridge
 
-Rubix Redis Bridge is a Rust HTTP bridge for Redis.
+Rubix Redis Bridge is a Rust base Redit over HTTP API bridge for Redis and Redis-compatible backends.
 
-It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that should not connect to Redis over TCP.
+It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
 
-Applications can use the supported `@upstash/redis` SDK command flow while the bridge enforces authentication, command policy, runtime limits, and per-target operation controls.
+Applications can use API or supported `@upstash/redis` SDK command flow while the bridge enforces authentication, policy, limits, and per-target controls.
 
 [![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml) [![Release](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml) [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
 
-Rubix Redis Bridge provides the core components required to expose Redis safely over HTTP for internal platforms, controlled workloads, and applications that require SDK-compatible Redis access.
+Rubix Redis Bridge provides the core components required to expose Redis safely over HTTP for platforms, workloads, and applications that require API and SDK-compatible Redis access.
 
 - Redis over HTTP
 - `@upstash/redis` SDK support
@@ -71,7 +71,7 @@ Expected response:
 
 ## API
 
-Rubix Redis Bridge implements the Redis HTTP command flow used by `@upstash/redis` for supported commands, while enforcing bridge-level authentication, command policy, and runtime limits.
+Rubix Redis Bridge implements the Redis HTTP command flow used by `@upstash/redis` for supported commands, while enforcing bridge-level authentication, policy, and limits.
 
 Available commands are controlled by `RRB_ALLOWED_COMMANDS`. Unsupported or blocked commands are rejected before Redis execution.
 
@@ -123,20 +123,9 @@ Use `POST /pipeline` for non-atomic batches.
 
 Use `POST /multi-exec` for managed transactions. Raw `MULTI`, `EXEC`, `WATCH`, `UNWATCH`, and `DISCARD` are blocked because they alter connection state on shared Redis connections.
 
-## SDK compatibility
+## Upstash SDK
 
 Rubix Redis Bridge has been tested with `@upstash/redis` across the supported command surface, including single commands, pipelines, managed transactions, and pipeline error handling.
-
-Confirmed paths:
-
-```txt
-redis.set()
-redis.get()
-redis.ping()
-redis.pipeline().exec()
-redis.multi().exec()
-pipeline.exec({ keepErrors: true })
-```
 
 Compatibility depends on the configured allowlist. If the SDK calls a command that is not allowed, the bridge rejects it.
 
@@ -145,6 +134,18 @@ Restricted allowlist example:
 ```bash
 RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
 ```
+
+## Backend
+
+Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibility depends on the backend implementation, the configured command allowlist, and whether Lua/script commands are required.
+
+| Backend | Status | Notes |
+| --- | --- | --- | --- |
+| Redis | Supported | Primary backend |
+| Valkey | Supported | Compatible backend |
+| Dragonfly | Supported | Compatible backend |
+| Kvrocks | Supported | Compatible backend |
+| Garnet | Partial | Lua/script tests failed |
 
 ## Upstash Ratelimit
 
@@ -165,15 +166,13 @@ When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy w
 
 `SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
 
-Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, or weakly authenticated callers.
+Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weak authenticated callers.
 
 ## Command policy
 
 Command policy defines which Redis commands can be executed through the bridge and ensures unsafe or explicitly blocked commands are rejected before Redis execution.
 
-`RRB_ALLOWED_COMMANDS` must resolve to a non-empty allowlist.
-
-If `RRB_ALLOWED_COMMANDS` is not provided, the bridge uses a conservative default allowlist. If `RRB_ALLOWED_COMMANDS` is explicitly empty, startup fails. This prevents accidental "allow everything" behaviour.
+`RRB_ALLOWED_COMMANDS` must resolve to a non-empty allowlist. If `RRB_ALLOWED_COMMANDS` is not provided, the bridge uses a conservative default allowlist. If `RRB_ALLOWED_COMMANDS` is explicitly empty, startup fails. This prevents accidental "allow everything" behaviour.
 
 Command names are normalized by default:
 
@@ -187,9 +186,7 @@ becomes:
 GET,SET,DEL
 ```
 
-`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands.
-
-Custom config cannot remove default blocks or re-enable hard-denied commands.
+`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands.
 
 ## Hard-denied commands
 
@@ -201,9 +198,7 @@ Default-denied scripting and function commands:
 EVAL, EVAL_RO, EVALSHA, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
-When `RRB_UPSTASH_RATELIMIT=true`, only `EVAL`, `EVALSHA`, and restricted `SCRIPT` usage can be enabled through `RRB_ALLOWED_COMMANDS`.
-
-Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
+When `RRB_UPSTASH_RATELIMIT=true`, only `EVAL`, `EVALSHA`, and restricted `SCRIPT` usage can be enabled through `RRB_ALLOWED_COMMANDS`. Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
 
 Examples:
 
@@ -226,6 +221,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_PORT` | `8080` | Bind port |
 | `RRB_MODE` | `file` | `env` or `file` |
 | `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
+| `RRB_HASH_TOKEN` | none | HMAC-SHA256 key for file-mode token hashes |
 | `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
 | `RRB_UPSTASH_RATELIMIT` | `false` | Enables ratelimit compatibility |
 | `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Auth failures before lockout |
@@ -298,20 +294,46 @@ Example:
 
 ```json
 {
-  "token-one": {
-    "rrb_id": "primary_redis",
-    "connection_string": "redis://default:password@redis:6379",
-    "max_connections": 100
-  },
-  "token-two": {
-    "rrb_id": "secondary_redis",
-    "connection_string": "redis://default:password@redis-two:6379",
-    "max_connections": 50
-  }
+  "version": 1,
+  "targets": [
+    {
+      "rrb_id": "primary_redis",
+      "connection_string": "redis://default:password@redis:6379",
+      "max_connections": 100,
+      "tokens": [
+        {
+          "id": "primary_app",
+          "name": "Production app token",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "rrb_id": "secondary_redis",
+      "connection_string": "redis://default:password@redis-two:6379",
+      "max_connections": 50,
+      "tokens": [
+        {
+          "id": "secondary_app",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "enabled": true
+        }
+      ]
+    }
+  ]
 }
 ```
 
-The JSON object key is the bearer token. `max_connections` sets the target operation cap.
+The client receives only the opaque bearer token. `rrb_id` and token `id` remain internal configuration values. They are not returned in Redis responses.
+
+File mode always uses HMAC-SHA256. Set `RRB_HASH_TOKEN` and generate the stored hash from the full opaque token:
+
+```bash
+printf '%s' "$RRB_TOKEN" | openssl dgst -sha256 -hmac "$RRB_HASH_TOKEN" -binary | xxd -p -c 256
+```
+
+Store only the 64-character hex digest.
 
 Keep the file private and mount it read-only:
 
@@ -321,15 +343,13 @@ chmod 600 tokens.json
 
 The bridge logs a warning when the token file is publicly accessible.
 
-If `rrb_id` is omitted, the bridge derives a redacted target id for logs and metrics.
-
 ## Health and metrics
 
 Health and metrics endpoints support operational monitoring without placing Redis command execution and bridge status checks behind the same application request path.
 
 `GET /healthz` reports process health.
 
-`GET /readyz` reports startup readiness. It confirms that at least one Redis target loaded. It does not ping every Redis backend.
+`GET /readyz` reports startup readiness. It confirms that at least one Redis target loaded.
 
 Backend failures are returned per command as `503`.
 
@@ -433,15 +453,16 @@ Rubix Redis Bridge should be deployed as a private infrastructure service with t
 
 Recommended:
 
-- Require a long random RRB_TOKEN
-- Enable require Redis auth
-- Narrow command access
-- Lower body limits
-- Add reverse proxy
-- Add rate limits
-- Add IP restrictions
-- Monitor failures
-- Avoid direct Redis
+- Random hex values for RRB_TOKEN
+- Random hex values for RRB_METRICS_TOKEN
+- Enable Redis authentication
+- Narrow command access to the minimum required command set
+- Lower request body limits where possible
+- Place the bridge behind a reverse proxy
+- Apply reverse proxy rate limits
+- Restrict access by trusted IP ranges or private networking
+- Monitor authentication failures, denied commands, lockouts, and latency
+- Avoid exposing the Redis server directly to public networks
 
 ## License
 

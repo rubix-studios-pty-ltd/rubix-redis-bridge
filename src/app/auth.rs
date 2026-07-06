@@ -4,6 +4,8 @@ use std::sync::Arc;
 use axum::http::HeaderMap;
 use subtle::ConstantTimeEq;
 
+use crate::config::TokenHash;
+
 use super::error::ApiError;
 use super::lockout::AuthFailureResult;
 use super::state::{AppState, RedisTarget};
@@ -88,15 +90,13 @@ impl AppState {
         ip: IpAddr,
     ) -> Result<Arc<RedisTarget>, ApiError> {
         let token = self.bearer_token(headers, ip)?;
-        let mut matched_target = None;
 
-        for (stored_token, target) in &self.targets {
-            if stored_token.as_bytes().ct_eq(token.as_bytes()).unwrap_u8() == 1 {
-                matched_target = Some(target.clone());
-            }
-        }
+        let token_hash = match self.hash_token.as_deref() {
+            Some(key) => TokenHash::hmac_sha256(key, token),
+            None => TokenHash::sha256(token),
+        };
 
-        let Some(target) = matched_target else {
+        let Some(target) = self.token_routes.get(&token_hash).cloned() else {
             return Err(self.unauthorized(ip, "Invalid token"));
         };
 

@@ -17,13 +17,13 @@ use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
 use crate::app::{AppState, command, healthz, metrics, multi_exec, pipeline, readyz, root};
-use crate::config::BridgeConfig;
+use crate::config::Bridge;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    let config = BridgeConfig::from_env().context("Failed to load bridge configuration")?;
+    let config = Bridge::from_env().context("Failed to load bridge configuration")?;
     let bind: SocketAddr = format!("{}:{}", config.host, config.port)
         .parse()
         .context("Invalid bind address")?;

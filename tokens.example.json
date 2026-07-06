@@ -1,7 +1,18 @@
 {
-  "replace-with-strong-token": {
-    "rrb_id": "primary_redis",
-    "connection_string": "redis://default:replace-with-redis-password@redis:6379",
-    "max_connections": 100
-  }
+  "version": 1,
+  "targets": [
+    {
+      "rrb_id": "primary_redis",
+      "connection_string": "redis://default:replace-with-redis-password@redis:6379",
+      "max_connections": 100,
+      "tokens": [
+        {
+          "id": "primary_app",
+          "name": "Primary application token",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "enabled": true
+        }
+      ]
+    }
+  ]
 }

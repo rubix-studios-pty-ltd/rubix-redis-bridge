@@ -1,16 +1,16 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
-use std::hash::{Hash, Hasher};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use anyhow::{Context, anyhow, bail};
+use serde::Deserialize;
 
 use super::env::{env_first, env_or, parse_env_first};
-use super::{RedisTargetConfig, default_max_connections, default_rrb_id};
+use super::{AuthToken, Redis, TokenHash, default_max_connections};
 
-pub(super) fn load_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
+pub(super) fn load_targets() -> anyhow::Result<Vec<Redis>> {
     let mode = env_or("RRB_MODE", "file");
 
     match mode.as_str() {
@@ -20,7 +20,7 @@ pub(super) fn load_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig
     }
 }
 
-fn load_env_target() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
+fn load_env_target() -> anyhow::Result<Vec<Redis>> {
     let token = env_first(&["RRB_TOKEN"])
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -37,21 +37,20 @@ fn load_env_target() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
         bail!("RRB_MAX_CONNECTIONS must be greater than zero");
     }
 
-    let mut targets = HashMap::new();
-
-    targets.insert(
-        token,
-        RedisTargetConfig {
-            rrb_id: "env_config_connection".to_string(),
-            connection_string,
-            max_connections,
-        },
-    );
-
-    Ok(targets)
+    Ok(vec![Redis {
+        rrb_id: "env".to_string(),
+        connection_string,
+        max_connections,
+        tokens: vec![AuthToken {
+            id: "env".to_string(),
+            name: Some("Environment token".to_string()),
+            hash: TokenHash::sha256(&token),
+            enabled: true,
+        }],
+    }])
 }
 
-fn load_file_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
+fn load_file_targets() -> anyhow::Result<Vec<Redis>> {
     let path = env_first(&["RRB_CONFIG_FILE", "TOKEN_RESOLUTION_FILE_PATH"])
         .unwrap_or_else(|| "/app/rrb-config/tokens.json".to_string());
 
@@ -60,50 +59,147 @@ fn load_file_targets() -> anyhow::Result<HashMap<String, RedisTargetConfig>> {
     let data = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read token config file: {path}"))?;
 
-    let raw_targets: HashMap<String, RedisTargetConfig> = serde_json::from_str(&data)
-        .with_context(|| format!("Failed to parse token config file: {path}"))?;
+    let hash_token = env_first(&["RRB_HASH_TOKEN"])
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
 
-    let mut targets = HashMap::with_capacity(raw_targets.len());
+    parse_file_targets(&data, hash_token.as_deref())
+        .with_context(|| format!("Failed to parse token config file: {path}"))
+}
 
-    for (token, mut target_config) in raw_targets {
-        let token = token.trim().to_string();
+#[derive(Deserialize)]
+struct FileConfig {
+    version: u16,
+    targets: Vec<FileTarget>,
+}
 
-        if token.is_empty() {
-            bail!("Token config file contains an empty token");
+#[derive(Deserialize)]
+struct FileTarget {
+    rrb_id: String,
+    connection_string: String,
+    #[serde(default = "default_max_connections")]
+    max_connections: usize,
+    tokens: Vec<FileAuthToken>,
+}
+
+#[derive(Deserialize)]
+struct FileAuthToken {
+    id: String,
+    #[serde(default)]
+    name: Option<String>,
+    hash: String,
+    #[serde(default = "default_enabled")]
+    enabled: bool,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Vec<Redis>> {
+    let _hash_token = hash_token
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("RRB_HASH_TOKEN is required when mode=file"))?;
+
+    let file_config: FileConfig = serde_json::from_str(data)?;
+
+    if file_config.version != 1 {
+        bail!("Unsupported token config version: {}", file_config.version);
+    }
+
+    if file_config.targets.is_empty() {
+        bail!("Token config file must contain at least one target");
+    }
+
+    let mut rrb_ids = HashSet::new();
+    let mut token_ids = HashSet::new();
+    let mut token_hashes = HashSet::new();
+    let mut targets = Vec::with_capacity(file_config.targets.len());
+
+    for target in file_config.targets {
+        let rrb_id = target.rrb_id.trim().to_string();
+
+        if rrb_id.is_empty() {
+            bail!("Token config file contains an empty rrb_id");
         }
 
-        if target_config.rrb_id.trim().is_empty() || target_config.rrb_id == default_rrb_id() {
-            target_config.rrb_id = derived_rrb_id(&token);
+        if !rrb_ids.insert(rrb_id.clone()) {
+            bail!("Token config file contains duplicate rrb_id: {rrb_id}");
         }
 
-        if target_config.connection_string.trim().is_empty() {
+        let connection_string = target.connection_string.trim().to_string();
+
+        if connection_string.is_empty() {
             bail!(
-                "Token config file contains an empty Redis connection string for target {}",
-                target_config.rrb_id
+                "Token config file contains an empty Redis connection string for target {rrb_id}"
             );
         }
 
-        if target_config.max_connections == 0 {
-            bail!(
-                "Token config file contains max_connections=0 for target {}",
-                target_config.rrb_id
-            );
+        if target.max_connections == 0 {
+            bail!("Token config file contains max_connections=0 for target {rrb_id}");
         }
 
-        if targets.insert(token, target_config).is_some() {
-            bail!("Token config file contains duplicate tokens after trimming whitespace");
+        if target.tokens.is_empty() {
+            bail!("Token config file contains no tokens for target {rrb_id}");
         }
+
+        let mut tokens = Vec::with_capacity(target.tokens.len());
+
+        for token in target.tokens {
+            let id = token.id.trim().to_string();
+
+            if id.is_empty() {
+                bail!("Token config file contains an empty token id for target {rrb_id}");
+            }
+
+            if !token_ids.insert(id.clone()) {
+                bail!("Token config file contains duplicate token id: {id}");
+            }
+
+            if !token.enabled {
+                tokens.push(AuthToken {
+                    id,
+                    name: token
+                        .name
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty()),
+                    hash: TokenHash::hmac_sha256_parse(&token.hash)?,
+                    enabled: false,
+                });
+                continue;
+            }
+
+            let hash = TokenHash::hmac_sha256_parse(&token.hash)?;
+
+            if !token_hashes.insert(hash.clone()) {
+                bail!("Token config file contains duplicate token hashes");
+            }
+
+            tokens.push(AuthToken {
+                id,
+                name: token
+                    .name
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty()),
+                hash,
+                enabled: true,
+            });
+        }
+
+        if !tokens.iter().any(|token| token.enabled) {
+            bail!("Token config file contains no enabled tokens for target {rrb_id}");
+        }
+
+        targets.push(Redis {
+            rrb_id,
+            connection_string,
+            max_connections: target.max_connections,
+            tokens,
+        });
     }
 
     Ok(targets)
-}
-
-fn derived_rrb_id(token: &str) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-    token.hash(&mut hasher);
-
-    format!("redis_target_{:016x}", hasher.finish())
 }
 
 #[cfg(unix)]
@@ -128,11 +224,5 @@ fn file_permissions(path: &str) {
 fn file_permissions(_path: &str) {}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn derives_custom_id() {
-        assert_ne!(derived_rrb_id("abc123"), default_rrb_id());
-    }
-}
+#[path = "targets_tests.rs"]
+mod tests;
