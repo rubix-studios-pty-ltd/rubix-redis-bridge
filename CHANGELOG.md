@@ -1,3 +1,30 @@
+## [1.0.0] - 2026-07-06
+
+### Bug Fixes
+
+- Dry run test release script
+
+### Refactor
+
+- Enhance release preparation script with dry run support and file restoration
+- Rename RedisTarget to Redis and update related configurations
+
+### Documentation
+
+- Update backend compatibility details in README
+- Correct wording in README for clarity on security recommendations
+- Improve clarity and detail in README content
+- Refine README for improved clarity and conciseness
+- Clarify deployment guidelines in THREAT_MODEL.md
+
+### Miscellaneous Tasks
+
+- Update changelog formatting and ensure proper line breaks
+- Update changelog formatting and commit parser groups for consistency
+- Add newline to changelog body for improved formatting
+- Update package name and configuration in package.json
+- Update configuration and enhance token management
+
 ## [0.3.3] - 2026-07-05
 
 ### Refactor
