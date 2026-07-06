@@ -177,15 +177,13 @@ When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy w
 
 `SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
 
-Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weakly authenticated callers, or backends that have not passed the bridge Lua/script tests.
+Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weak authenticated callers, or backends that have not passed the bridge Lua/script tests.
 
 ## Command policy
 
 Command policy defines which Redis commands can be executed through the bridge and ensures unsafe or explicitly blocked commands are rejected before Redis execution.
 
-`RRB_ALLOWED_COMMANDS` must resolve to a non-empty allowlist.
-
-If `RRB_ALLOWED_COMMANDS` is not provided, the bridge uses a conservative default allowlist. If `RRB_ALLOWED_COMMANDS` is explicitly empty, startup fails. This prevents accidental "allow everything" behaviour.
+`RRB_ALLOWED_COMMANDS` must resolve to a non-empty allowlist. If `RRB_ALLOWED_COMMANDS` is not provided, the bridge uses a conservative default allowlist. If `RRB_ALLOWED_COMMANDS` is explicitly empty, startup fails. This prevents accidental "allow everything" behaviour.
 
 Command names are normalized by default:
 
@@ -213,9 +211,7 @@ Default-denied scripting and function commands:
 EVAL, EVAL_RO, EVALSHA, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
-When `RRB_UPSTASH_RATELIMIT=true`, only `EVAL`, `EVALSHA`, and restricted `SCRIPT` usage can be enabled through `RRB_ALLOWED_COMMANDS`.
-
-Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
+When `RRB_UPSTASH_RATELIMIT=true`, only `EVAL`, `EVALSHA`, and restricted `SCRIPT` usage can be enabled through `RRB_ALLOWED_COMMANDS`. Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
 
 Examples:
 
