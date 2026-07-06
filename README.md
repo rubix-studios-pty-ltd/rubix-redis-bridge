@@ -48,7 +48,7 @@ docker run --rm -p 7777:8080 \
   -e RRB_MODE=env \
   -e RRB_TOKEN='replace-with-strong-http-token' \
   -e RRB_CONNECTION_STRING='redis://default:replace-with-redis-password@redis:6379' \
-  -e RRB_RRB_OPERATION_LIMIT='100' \
+  -e RRB_OPERATION_LIMIT='100' \
   -e RRB_CONNECTION_SHARDS='4' \
   -e RRB_REQUEST_TIMEOUT_MS='5000' \
   -e RRB_ALLOWED_COMMANDS='PING,GET,SET,DEL,EXISTS,EXPIRE,TTL' \
