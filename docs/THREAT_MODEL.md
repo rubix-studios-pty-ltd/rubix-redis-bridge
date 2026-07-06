@@ -41,7 +41,7 @@ Rubix Redis Bridge is intended for controlled private deployments.
 
 Recommended deployment patterns include Docker networks, private service networks, Tailscale networks, internal reverse proxies, private Cloudflare Tunnel routes, and server-side workloads that need Upstash-style Redis HTTP access without exposing Redis over TCP.
 
-The bridge should not be treated as a public unauthenticated Redis API, a full Upstash platform clone, a general-purpose Redis admin proxy, or a replacement for Redis server hardening.
+The bridge should not be treated as a public unauthenticated Redis API, a general-purpose Redis admin proxy, or a replacement for Redis server hardening.
 
 A secure deployment should meet these baseline conditions.
 
@@ -101,7 +101,7 @@ External client or application
         |
         | HTTPS or private network
         v
-Reverse proxy, VPN, tunnel, or Docker network boundary
+Reverse proxy, VPN, tunnel, or Docker network
         |
         | HTTP with bearer token
         v
