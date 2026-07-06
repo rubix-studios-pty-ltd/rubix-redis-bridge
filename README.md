@@ -1,16 +1,16 @@
 # Rubix Redis Bridge
 
-Rubix Redis Bridge is a Rust HTTP bridge for Redis and Redis-compatible backends.
+Rubix Redis Bridge is a Rust base Redit over HTTP API bridge for Redis and Redis-compatible backends.
 
-It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that should not connect to Redis over TCP.
+It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
 
-Applications can use the supported `@upstash/redis` SDK command flow while the bridge enforces authentication, command policy, runtime limits, and per-target operation controls.
+Applications can use API or supported `@upstash/redis` SDK command flow while the bridge enforces authentication, policy, limits, and per-target controls.
 
 [![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml) [![Release](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml) [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
 
-Rubix Redis Bridge provides the core components required to expose Redis safely over HTTP for internal platforms, controlled workloads, and applications that require SDK-compatible Redis access.
+Rubix Redis Bridge provides the core components required to expose Redis safely over HTTP for platforms, workloads, and applications that require API and SDK-compatible Redis access.
 
 - Redis over HTTP
 - `@upstash/redis` SDK support
@@ -150,13 +150,13 @@ RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,D
 
 Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibility depends on the backend implementation, the configured command allowlist, and whether Lua/script commands are required.
 
-| Backend | Status | Tested | Notes |
+| Backend | Status | Notes |
 | --- | --- | --- | --- |
-| Redis | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Primary backend target |
-| Valkey | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Dragonfly | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Kvrocks | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Garnet | Partial | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Lua/script tests failed; Upstash Ratelimit unsupported |
+| Redis | Supported | Primary backend |
+| Valkey | Supported | Compatible backend |
+| Dragonfly | Supported | Compatible backend |
+| Kvrocks | Supported | Compatible backend |
+| Garnet | Partial | Lua/script tests failed |
 
 ## Upstash Ratelimit
 
