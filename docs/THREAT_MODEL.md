@@ -134,7 +134,7 @@ The bridge connects to the configured Redis backend through a Redis connection m
 
 Main risks at this boundary include backend overload, Redis timeout, large response generation, incorrect Redis credentials, over-broad command access, and accidental cross-target access.
 
-Recommended controls include Redis authentication, private networking, per-target `RRB_MAX_CONNECTIONS`, `RRB_REQUEST_TIMEOUT_MS`, narrow allowlists, Redis resource limits, and operational monitoring.
+Recommended controls include Redis authentication, private networking, per-target `RRB_MAX_CONCURRENCY`, `RRB_REQUEST_TIMEOUT_MS`, narrow allowlists, Redis resource limits, and operational monitoring.
 
 ### Boundary 4. Operator to configuration
 
@@ -320,12 +320,12 @@ The Redis backend can be overloaded by high concurrency, slow commands, large re
 
 | Risk | Control |
 | --- | --- |
-| Too many simultaneous Redis operations | Configure per-target `RRB_MAX_CONNECTIONS` |
+| Too many simultaneous Redis operations | Configure per-target `RRB_MAX_CONCURRENCY` |
 | Too many simultaneous HTTP requests | Configure `RRB_MAX_CONCURRENCY` and edge rate limits |
 | Slow Redis backend | Configure `RRB_REQUEST_TIMEOUT_MS` |
 | Backend unavailable | `/readyz` indicates target configuration readiness, while operation errors return unavailable or timeout responses |
 
-`RRB_MAX_CONNECTIONS` acts as an in-flight operation cap per target. It should be sized according to Redis capacity and application latency requirements.
+`RRB_OPERATION_LIMIT` acts as an in-flight operation cap per target. It should be sized according to Redis capacity and application latency requirements.
 
 ### 10. Multi-target isolation failure
 
@@ -405,7 +405,7 @@ Misconfiguration is one of the most likely deployment risks.
 | `RRB_UPSTASH_RATELIMIT=true` without need | Lua compatibility risk | Enable only for trusted ratelimit use cases |
 | Missing `RRB_METRICS_TOKEN` | Metrics unavailable | Configure a separate metrics token for monitoring |
 | Large pipeline limit | Request amplification | Lower `RRB_MAX_PIPELINE_COMMANDS` for exposed deployments |
-| High concurrency | Backend overload | Set `RRB_MAX_CONCURRENCY` and `RRB_MAX_CONNECTIONS` according to Redis capacity |
+| High concurrency | Backend overload | Set `RRB_MAX_CONCURRENCY` and `RRB_OPERATION_LIMIT` according to Redis capacity |
 | Long request timeout | Resource retention under failure | Keep `RRB_REQUEST_TIMEOUT_MS` bounded |
 | Permissive token file permissions | Local secret exposure | Use owner-only file permissions |
 
@@ -477,17 +477,27 @@ Use this profile for a private application cache that does not require Lua scrip
 
 ```bash
 RRB_MODE=env
-RRB_TOKEN=<long-random-token>
+RRB_PORT=8080
+
 RRB_CONNECTION_STRING=redis://default:<redis-password>@redis:6379
+
+RRB_TOKEN=<long-random-token>
 RRB_METRICS_TOKEN=<long-random-metrics-token>
+
+RRB_MAX_CONCURRENCY=128
+RRB_OPERATION_LIMIT=20
+RRB_CONNECTION_SHARDS=4
+
 RRB_ALLOWED_COMMANDS=PING,GET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL
 RRB_UPSTASH_RATELIMIT=false
+
 RRB_MAX_BODY_BYTES=262144
 RRB_MAX_PIPELINE_COMMANDS=100
 RRB_MAX_COMMAND_ARGS=32
 RRB_MAX_ARG_BYTES=65536
-RRB_MAX_CONCURRENCY=128
-RRB_MAX_CONNECTIONS=20
+RRB_MAX_RESPONSE_BYTES=1048576
+
+RRB_ACQUIRE_TIMEOUT_MS=100
 RRB_REQUEST_TIMEOUT_MS=3000
 ```
 
@@ -497,17 +507,25 @@ Use this profile only for trusted private applications that require `@upstash/ra
 
 ```bash
 RRB_MODE=env
-RRB_TOKEN=<long-random-token>
+
 RRB_CONNECTION_STRING=redis://default:<redis-password>@redis:6379
+
+RRB_TOKEN=<long-random-token>
 RRB_METRICS_TOKEN=<long-random-metrics-token>
-RRB_UPSTASH_RATELIMIT=true
+
+RRB_MAX_CONCURRENCY=1024
+RRB_OPERATION_LIMIT=100
+
 RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY,EVALSHA,EVAL,SCRIPT
+RRB_UPSTASH_RATELIMIT=true
+
 RRB_MAX_BODY_BYTES=1048576
 RRB_MAX_PIPELINE_COMMANDS=1000
 RRB_MAX_COMMAND_ARGS=256
 RRB_MAX_ARG_BYTES=262144
-RRB_MAX_CONCURRENCY=1024
-RRB_MAX_CONNECTIONS=100
+RRB_MAX_RESPONSE_BYTES=10485760
+
+RRB_ACQUIRE_TIMEOUT_MS=100
 RRB_REQUEST_TIMEOUT_MS=5000
 ```
 
@@ -522,12 +540,14 @@ Use file mode when separate tokens should route to separate Redis targets.
   "app-one-token": {
     "rrb_id": "app_one_cache",
     "connection_string": "redis://default:<password>@redis-one:6379",
-    "max_connections": 20
+    "operation_limit": 20,
+    "connection_shards": 4
   },
   "app-two-token": {
     "rrb_id": "app_two_cache",
     "connection_string": "redis://default:<password>@redis-two:6379",
-    "max_connections": 20
+    "operation_limit": 20,
+    "connection_shards": 4
   }
 }
 ```

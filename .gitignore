@@ -1,5 +1,24 @@
-target
+# Source
 .git
+.gitignore
+
+# Build
+target/
+
+# Dependencies
+node_modules/
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# Logs
 *.log
-node_modules
+logs/
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -48,7 +48,8 @@ docker run --rm -p 7777:8080 \
   -e RRB_MODE=env \
   -e RRB_TOKEN='replace-with-strong-http-token' \
   -e RRB_CONNECTION_STRING='redis://default:replace-with-redis-password@redis:6379' \
-  -e RRB_MAX_CONNECTIONS='100' \
+  -e RRB_OPERATION_LIMIT='100' \
+  -e RRB_CONNECTION_SHARDS='4' \
   -e RRB_REQUEST_TIMEOUT_MS='5000' \
   -e RRB_ALLOWED_COMMANDS='PING,GET,SET,DEL,EXISTS,EXPIRE,TTL' \
   rubixvi/rubix-redis-bridge:latest
@@ -140,7 +141,7 @@ RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,D
 Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibility depends on the backend implementation, the configured command allowlist, and whether Lua/script commands are required.
 
 | Backend | Status | Notes |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | Redis | Supported | Primary backend |
 | Valkey | Supported | Compatible backend |
 | Dragonfly | Supported | Compatible backend |
@@ -219,33 +220,38 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | --- | --- | --- |
 | `RRB_HOST` | `0.0.0.0` | Bind host |
 | `RRB_PORT` | `8080` | Bind port |
-| `RRB_MODE` | `file` | `env` or `file` |
+| `RRB_MODE` | `file` | Configuration mode. Use `env` for a single Redis target or `file` for token-based multi-target routing |
+| `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | File-mode configuration path |
+| `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternate file-mode configuration path |
+| `RRB_CONNECTION_STRING` | none | Redis connection URL used in `env` mode |
 | `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
 | `RRB_HASH_TOKEN` | none | HMAC-SHA256 key for file-mode token hashes |
 | `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
+| `RRB_TRUST_PROXY_HEADERS` | `false` | Enables client IP resolution from trusted proxy headers |
+| `RRB_TRUSTED_PROXIES` | none | Trusted proxy IP addresses or CIDR ranges |
+| `RRB_MAX_CONCURRENCY` | `1024` | Global HTTP API concurrency limit |
+| `RRB_OPERATION_LIMIT` | `100` | Maximum in-flight Redis operations per target |
+| `RRB_CONNECTION_SHARDS` | `4` | Redis `ConnectionManager` shards per target |
+| `RRB_ALLOWED_COMMANDS` | conservative default | Allowed Redis commands |
+| `RRB_BLOCKED_COMMANDS` | secure default | Additional Redis commands to block |
 | `RRB_UPSTASH_RATELIMIT` | `false` | Enables ratelimit compatibility |
-| `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Auth failures before lockout |
-| `RRB_AUTH_LOCKOUT_WINDOW_SECONDS` | `300` | Failure counting window |
-| `RRB_AUTH_LOCKOUT_SECONDS` | `300` | Lockout duration |
-| `RRB_AUTH_LOCKOUT_MAX_ENTRIES` | `65536` | Tracked IP limit |
-| `RRB_TRUST_PROXY_HEADERS` | `false` | Enables trusted proxy headers |
-| `RRB_TRUSTED_PROXIES` | none | Trusted proxy IPs or CIDRs |
-| `RRB_CONNECTION_STRING` | none | Redis URL in `env` mode |
-| `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
-| `RRB_ALLOWED_COMMANDS` | conservative default | Allowed commands |
-| `RRB_BLOCKED_COMMANDS` | secure default | Additional blocked commands |
-| `RRB_MAX_BODY_BYTES` | `1048576` | Request body limit in bytes |
-| `RRB_MAX_CONCURRENCY` | `1024` | HTTP API concurrency limit |
-| `RRB_MAX_PIPELINE_COMMANDS` | `1000` | Pipeline command count limit |
-| `RRB_MAX_COMMAND_ARGS` | `256` | Per-command argument count limit |
-| `RRB_MAX_ARG_BYTES` | `262144` | Per-argument byte limit |
-| `RRB_MAX_RESPONSE_BYTES` | `10485760` | Encoded Redis response byte limit |
-| `RRB_REQUEST_TIMEOUT_MS` | `5000` | Timeout for Redis operation execution |
-| `RRB_ACQUIRE_TIMEOUT_MS` | `100` | Timeout while waiting for target Redis operation capacity |
-| `RRB_CONFIG_FILE` | `/app/rrb-config/tokens.json` | File config path |
-| `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternate config path |
+| `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Failed authentication attempts allowed before lockout |
+| `RRB_AUTH_LOCKOUT_WINDOW_SECONDS` | `300` | Time window for counting authentication failures |
+| `RRB_AUTH_LOCKOUT_SECONDS` | `300` | Lockout duration after too many authentication failures |
+| `RRB_AUTH_LOCKOUT_MAX_ENTRIES` | `65536` | Maximum number of client IPs tracked by the lockout cache |
+| `RRB_MAX_BODY_BYTES` | `1048576` | Maximum HTTP request body size in bytes |
+| `RRB_MAX_PIPELINE_COMMANDS` | `1000` | Maximum Redis commands allowed in one pipeline request |
+| `RRB_MAX_COMMAND_ARGS` | `256` | Maximum argument count per Redis command |
+| `RRB_MAX_ARG_BYTES` | `262144` | Maximum byte size for a single Redis command argument |
+| `RRB_MAX_RESPONSE_BYTES` | `10485760` | Maximum encoded JSON response size returned |
+| `RRB_REQUEST_TIMEOUT_MS` | `5000` | Timeout for Redis connection acquisition and command execution after an operation permit is acquired |
+| `RRB_ACQUIRE_TIMEOUT_MS` | `100` | Timeout while waiting for per-target Redis operation capacity |
 
-`RRB_MAX_CONNECTIONS` is an in-flight Redis operation cap. It does not create dedicated Redis TCP connections.
+`RRB_MAX_CONCURRENCY` limits the number of concurrent HTTP requests handled by the bridge. It is a global API-level limit.
+
+`RRB_OPERATION_LIMIT` limits the number of Redis operations that may be in flight for a single Redis target. This is the per-target admission-control and backpressure limit.
+
+`RRB_CONNECTION_SHARDS` controls how many Redis ConnectionManager instances are created lazily per target. Admitted Redis operations are distributed across these shards using round-robin selection. Typical values are 4 to 8. Keep this lower than `RRB_OPERATION_LIMIT`.
 
 `RRB_ACQUIRE_TIMEOUT_MS` applies backpressure before Redis execution. When the target operation gate is saturated, the bridge rejects quickly with `429` instead of retaining many request bodies while waiting for Redis capacity.
 
@@ -299,7 +305,8 @@ Example:
     {
       "rrb_id": "primary_redis",
       "connection_string": "redis://default:password@redis:6379",
-      "max_connections": 100,
+      "operation_limit": 100,
+      "connection_shards": 4,
       "tokens": [
         {
           "id": "primary_app",
@@ -312,7 +319,8 @@ Example:
     {
       "rrb_id": "secondary_redis",
       "connection_string": "redis://default:password@redis-two:6379",
-      "max_connections": 50,
+      "operation_limit": 50,
+      "connection_shards": 4,
       "tokens": [
         {
           "id": "secondary_app",
