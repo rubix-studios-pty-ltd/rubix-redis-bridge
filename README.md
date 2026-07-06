@@ -153,10 +153,10 @@ Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibi
 | Backend | Status | Tested | Notes |
 | --- | --- | --- | --- |
 | Redis | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Primary backend target |
-| Valkey | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Dragonfly | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Kvrocks | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
-| Garnet | Partial | Standard commands, pipelines, Lua/script profile, validation, metrics | Lua/script tests failed; Upstash Ratelimit unsupported |
+| Valkey | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Dragonfly | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Kvrocks | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Garnet | Partial | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Lua/script tests failed; Upstash Ratelimit unsupported |
 
 ## Upstash Ratelimit
 
