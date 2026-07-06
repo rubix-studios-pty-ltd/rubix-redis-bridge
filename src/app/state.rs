@@ -88,7 +88,8 @@ impl AppState {
                 );
             }
 
-            let connections: Vec<OnceCell<ConnectionManager>> = (0..target_config.connection_shards)
+            let connections: Vec<OnceCell<ConnectionManager>> = (0..target_config
+                .connection_shards)
                 .map(|_| OnceCell::new())
                 .collect();
 
