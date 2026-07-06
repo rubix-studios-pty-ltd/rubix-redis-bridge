@@ -1,3 +1,24 @@
+## [1.0.1] - 2026-07-06
+
+### Bug Fixes
+
+- Connection shards
+- Update environment variable references in README and code
+
+### Refactor
+
+- Simplify operation_limit assignment in load_env_target function
+
+### Documentation
+
+- Update README to reflect environment variable name change
+- Update README table formatting for backend compatibility section
+
+### Miscellaneous Tasks
+
+- Update crossbeam-utils to version 0.8.22 and format code for clarity
+- Update .dockerignore, .gitignore, and environment configurations
+
 ## [1.0.0] - 2026-07-06
 
 ### Bug Fixes
