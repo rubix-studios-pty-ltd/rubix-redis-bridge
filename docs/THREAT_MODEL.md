@@ -522,12 +522,14 @@ Use file mode when separate tokens should route to separate Redis targets.
   "app-one-token": {
     "rrb_id": "app_one_cache",
     "connection_string": "redis://default:<password>@redis-one:6379",
-    "max_connections": 20
+    "max_connections": 20,
+    "connection_shards": 4
   },
   "app-two-token": {
     "rrb_id": "app_two_cache",
     "connection_string": "redis://default:<password>@redis-two:6379",
-    "max_connections": 20
+    "max_connections": 20,
+    "connection_shards": 4
   }
 }
 ```

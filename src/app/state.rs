@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
@@ -33,7 +34,8 @@ pub struct AppState {
 
 pub(crate) struct RedisTarget {
     pub(crate) config: Redis,
-    connection: OnceCell<ConnectionManager>,
+    connections: Vec<OnceCell<ConnectionManager>>,
+    next_connection: AtomicUsize,
     operation_limit: Semaphore,
 }
 
@@ -59,7 +61,8 @@ impl fmt::Debug for RedisTarget {
             .field("rrb_id", &self.config.rrb_id)
             .field("connection_string", &"[redacted]")
             .field("max_connections", &self.config.max_connections)
-            .field("connection_initialized", &self.connection.get().is_some())
+            .field("connection_shards", &self.config.connection_shards)
+            .field("connections_initialized", &self.connections_initialized())
             .field("operation_limit", &self.config.max_connections)
             .finish()
     }
@@ -71,10 +74,29 @@ impl AppState {
         let mut token_routes = HashMap::new();
 
         for target_config in config.targets {
+            if target_config.max_connections == 0 {
+                anyhow::bail!(
+                    "Redis target {} has max_connections=0",
+                    target_config.rrb_id
+                );
+            }
+
+            if target_config.connection_shards == 0 {
+                anyhow::bail!(
+                    "Redis target {} has connection_shards=0",
+                    target_config.rrb_id
+                );
+            }
+
+            let connections: Vec<OnceCell<ConnectionManager>> = (0..target_config.connection_shards)
+                .map(|_| OnceCell::new())
+                .collect();
+
             let target = Arc::new(RedisTarget {
                 operation_limit: Semaphore::new(target_config.max_connections),
+                connections,
+                next_connection: AtomicUsize::new(0),
                 config: target_config,
-                connection: OnceCell::new(),
             });
 
             for token in &target.config.tokens {
@@ -175,8 +197,9 @@ impl RedisTarget {
     }
 
     pub(crate) async fn connection(&self) -> anyhow::Result<ConnectionManager> {
-        let connection = self
-            .connection
+        let shard = self.next_connection.fetch_add(1, Ordering::Relaxed) % self.connections.len();
+
+        let connection = self.connections[shard]
             .get_or_try_init(|| async {
                 let client = redis::Client::open(self.config.connection_string.as_str())
                     .with_context(|| {
@@ -184,11 +207,21 @@ impl RedisTarget {
                     })?;
 
                 client.get_connection_manager().await.with_context(|| {
-                    format!("Failed to connect to Redis target {}", self.config.rrb_id)
+                    format!(
+                        "Failed to connect to Redis target {} connection shard {}",
+                        self.config.rrb_id, shard
+                    )
                 })
             })
             .await?;
 
         Ok(connection.clone())
+    }
+
+    fn connections_initialized(&self) -> usize {
+        self.connections
+            .iter()
+            .filter(|connection| connection.get().is_some())
+            .count()
     }
 }

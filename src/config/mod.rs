@@ -45,6 +45,7 @@ pub struct Redis {
     pub rrb_id: String,
     pub connection_string: String,
     pub max_connections: usize,
+    pub connection_shards: usize,
     pub tokens: Vec<AuthToken>,
 }
 
@@ -87,6 +88,7 @@ impl fmt::Debug for Redis {
             .field("rrb_id", &self.rrb_id)
             .field("connection_string", &"[redacted]")
             .field("max_connections", &self.max_connections)
+            .field("connection_shards", &self.connection_shards)
             .field("token_count", &self.tokens.len())
             .finish()
     }
@@ -246,4 +248,8 @@ impl Bridge {
 
 fn default_max_connections() -> usize {
     3
+}
+
+fn default_connection_shards() -> usize {
+    4
 }

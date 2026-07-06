@@ -49,6 +49,7 @@ docker run --rm -p 7777:8080 \
   -e RRB_TOKEN='replace-with-strong-http-token' \
   -e RRB_CONNECTION_STRING='redis://default:replace-with-redis-password@redis:6379' \
   -e RRB_MAX_CONNECTIONS='100' \
+  -e RRB_CONNECTION_SHARDS='4' \
   -e RRB_REQUEST_TIMEOUT_MS='5000' \
   -e RRB_ALLOWED_COMMANDS='PING,GET,SET,DEL,EXISTS,EXPIRE,TTL' \
   rubixvi/rubix-redis-bridge:latest
@@ -232,6 +233,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_TRUSTED_PROXIES` | none | Trusted proxy IPs or CIDRs |
 | `RRB_CONNECTION_STRING` | none | Redis URL in `env` mode |
 | `RRB_MAX_CONNECTIONS` | `3` | Concurrent Redis operation cap per target |
+| `RRB_CONNECTION_SHARDS` | `4` | Physical Redis `ConnectionManager` shards per target |
 | `RRB_ALLOWED_COMMANDS` | conservative default | Allowed commands |
 | `RRB_BLOCKED_COMMANDS` | secure default | Additional blocked commands |
 | `RRB_MAX_BODY_BYTES` | `1048576` | Request body limit in bytes |
@@ -246,6 +248,8 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternate config path |
 
 `RRB_MAX_CONNECTIONS` is an in-flight Redis operation cap. It does not create dedicated Redis TCP connections.
+
+`RRB_CONNECTION_SHARDS` controls the number of physical `ConnectionManager` instances created lazily per target. Keep this lower than the operation cap. Typical values are `4` to `8`. The bridge round-robins admitted operations across these shards so a large Redis response on one connection does not block unrelated traffic on every operation.
 
 `RRB_ACQUIRE_TIMEOUT_MS` applies backpressure before Redis execution. When the target operation gate is saturated, the bridge rejects quickly with `429` instead of retaining many request bodies while waiting for Redis capacity.
 
@@ -300,6 +304,7 @@ Example:
       "rrb_id": "primary_redis",
       "connection_string": "redis://default:password@redis:6379",
       "max_connections": 100,
+      "connection_shards": 4,
       "tokens": [
         {
           "id": "primary_app",
@@ -313,6 +318,7 @@ Example:
       "rrb_id": "secondary_redis",
       "connection_string": "redis://default:password@redis-two:6379",
       "max_connections": 50,
+      "connection_shards": 4,
       "tokens": [
         {
           "id": "secondary_app",

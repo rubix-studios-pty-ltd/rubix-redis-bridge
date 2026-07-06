@@ -8,7 +8,7 @@ use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
 
 use super::env::{env_first, env_or, parse_env_first};
-use super::{AuthToken, Redis, TokenHash, default_max_connections};
+use super::{AuthToken, Redis, TokenHash, default_connection_shards, default_max_connections};
 
 pub(super) fn load_targets() -> anyhow::Result<Vec<Redis>> {
     let mode = env_or("RRB_MODE", "file");
@@ -33,14 +33,22 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
 
     let max_connections = parse_env_first(&["RRB_MAX_CONNECTIONS"], default_max_connections())?;
 
+    let connection_shards =
+        parse_env_first(&["RRB_CONNECTION_SHARDS"], default_connection_shards())?;
+
     if max_connections == 0 {
         bail!("RRB_MAX_CONNECTIONS must be greater than zero");
+    }
+
+    if connection_shards == 0 {
+        bail!("RRB_CONNECTION_SHARDS must be greater than zero");
     }
 
     Ok(vec![Redis {
         rrb_id: "env".to_string(),
         connection_string,
         max_connections,
+        connection_shards,
         tokens: vec![AuthToken {
             id: "env".to_string(),
             name: Some("Environment token".to_string()),
@@ -79,6 +87,8 @@ struct FileTarget {
     connection_string: String,
     #[serde(default = "default_max_connections")]
     max_connections: usize,
+    #[serde(default = "default_connection_shards")]
+    connection_shards: usize,
     tokens: Vec<FileAuthToken>,
 }
 
@@ -140,6 +150,10 @@ fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Ve
             bail!("Token config file contains max_connections=0 for target {rrb_id}");
         }
 
+        if target.connection_shards == 0 {
+            bail!("Token config file contains connection_shards=0 for target {rrb_id}");
+        }
+
         if target.tokens.is_empty() {
             bail!("Token config file contains no tokens for target {rrb_id}");
         }
@@ -195,6 +209,7 @@ fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Ve
             rrb_id,
             connection_string,
             max_connections: target.max_connections,
+            connection_shards: target.connection_shards,
             tokens,
         });
     }
