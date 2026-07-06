@@ -10,7 +10,7 @@ use redis::aio::ConnectionManager;
 use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use crate::client::TrustedProxies;
-use crate::config::{Bridge, RedisTarget as RedisConfig, TokenHash};
+use crate::config::{Bridge, Redis, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
@@ -32,7 +32,7 @@ pub struct AppState {
 }
 
 pub(crate) struct RedisTarget {
-    pub(crate) config: RedisConfig,
+    pub(crate) config: Redis,
     connection: OnceCell<ConnectionManager>,
     operation_limit: Semaphore,
 }

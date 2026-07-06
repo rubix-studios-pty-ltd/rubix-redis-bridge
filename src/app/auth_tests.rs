@@ -7,7 +7,7 @@ use axum::response::IntoResponse;
 
 use crate::app::error::ApiError;
 use crate::client::TrustedProxies;
-use crate::config::{AuthToken, Bridge, RedisTarget, TokenHash};
+use crate::config::{AuthToken, Bridge, Redis, TokenHash};
 use crate::security::SecurityPolicy;
 
 use super::AppState;
@@ -30,7 +30,7 @@ fn error_status(error: ApiError) -> StatusCode {
 }
 
 fn test_state(auth_lockout_failures: usize) -> AppState {
-    let targets = vec![RedisTarget {
+    let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
         max_connections: 1,
@@ -75,7 +75,7 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
 }
 
 fn test_hmac() -> AppState {
-    let targets = vec![RedisTarget {
+    let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
         max_connections: 1,

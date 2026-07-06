@@ -23,7 +23,7 @@ pub use self::token_hash::TokenHash;
 pub struct Bridge {
     pub host: String,
     pub port: u16,
-    pub targets: Vec<RedisTarget>,
+    pub targets: Vec<Redis>,
     pub hash_token: Option<String>,
     pub security: SecurityPolicy,
     pub max_body_bytes: usize,
@@ -41,7 +41,7 @@ pub struct Bridge {
 }
 
 #[derive(Clone)]
-pub struct RedisTarget {
+pub struct Redis {
     pub rrb_id: String,
     pub connection_string: String,
     pub max_connections: usize,
@@ -80,10 +80,10 @@ impl fmt::Debug for Bridge {
     }
 }
 
-impl fmt::Debug for RedisTarget {
+impl fmt::Debug for Redis {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("RedisTarget")
+            .debug_struct("Redis")
             .field("rrb_id", &self.rrb_id)
             .field("connection_string", &"[redacted]")
             .field("max_connections", &self.max_connections)

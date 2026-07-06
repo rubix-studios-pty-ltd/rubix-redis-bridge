@@ -33,7 +33,7 @@ impl TokenHash {
         }
     }
 
-    pub fn parse_hmac_sha256(value: &str) -> anyhow::Result<Self> {
+    pub fn hmac_sha256_parse(value: &str) -> anyhow::Result<Self> {
         let value = value.trim();
 
         if value.len() != SHA256_DIGEST_BYTES * 2 {

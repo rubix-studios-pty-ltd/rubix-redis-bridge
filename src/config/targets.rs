@@ -8,9 +8,9 @@ use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
 
 use super::env::{env_first, env_or, parse_env_first};
-use super::{AuthToken, RedisTarget, TokenHash, default_max_connections};
+use super::{AuthToken, Redis, TokenHash, default_max_connections};
 
-pub(super) fn load_targets() -> anyhow::Result<Vec<RedisTarget>> {
+pub(super) fn load_targets() -> anyhow::Result<Vec<Redis>> {
     let mode = env_or("RRB_MODE", "file");
 
     match mode.as_str() {
@@ -20,7 +20,7 @@ pub(super) fn load_targets() -> anyhow::Result<Vec<RedisTarget>> {
     }
 }
 
-fn load_env_target() -> anyhow::Result<Vec<RedisTarget>> {
+fn load_env_target() -> anyhow::Result<Vec<Redis>> {
     let token = env_first(&["RRB_TOKEN"])
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -37,7 +37,7 @@ fn load_env_target() -> anyhow::Result<Vec<RedisTarget>> {
         bail!("RRB_MAX_CONNECTIONS must be greater than zero");
     }
 
-    Ok(vec![RedisTarget {
+    Ok(vec![Redis {
         rrb_id: "env".to_string(),
         connection_string,
         max_connections,
@@ -50,7 +50,7 @@ fn load_env_target() -> anyhow::Result<Vec<RedisTarget>> {
     }])
 }
 
-fn load_file_targets() -> anyhow::Result<Vec<RedisTarget>> {
+fn load_file_targets() -> anyhow::Result<Vec<Redis>> {
     let path = env_first(&["RRB_CONFIG_FILE", "TOKEN_RESOLUTION_FILE_PATH"])
         .unwrap_or_else(|| "/app/rrb-config/tokens.json".to_string());
 
@@ -96,7 +96,7 @@ fn default_enabled() -> bool {
     true
 }
 
-fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Vec<RedisTarget>> {
+fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Vec<Redis>> {
     let _hash_token = hash_token
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -164,13 +164,13 @@ fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Ve
                         .name
                         .map(|value| value.trim().to_string())
                         .filter(|value| !value.is_empty()),
-                    hash: TokenHash::parse_hmac_sha256(&token.hash)?,
+                    hash: TokenHash::hmac_sha256_parse(&token.hash)?,
                     enabled: false,
                 });
                 continue;
             }
 
-            let hash = TokenHash::parse_hmac_sha256(&token.hash)?;
+            let hash = TokenHash::hmac_sha256_parse(&token.hash)?;
 
             if !token_hashes.insert(hash.clone()) {
                 bail!("Token config file contains duplicate token hashes");
@@ -191,7 +191,7 @@ fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Ve
             bail!("Token config file contains no enabled tokens for target {rrb_id}");
         }
 
-        targets.push(RedisTarget {
+        targets.push(Redis {
             rrb_id,
             connection_string,
             max_connections: target.max_connections,

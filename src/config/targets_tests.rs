@@ -1,7 +1,7 @@
 use super::parse_file_targets;
 
 #[test]
-fn parses_versioned_file_targets() {
+fn parses_file_targets() {
     let data = r#"
         {
           "version": 1,
@@ -30,7 +30,7 @@ fn parses_versioned_file_targets() {
 }
 
 #[test]
-fn rejects_file_mode_without_hash_key() {
+fn rejects_file_mode_without_hash() {
     let data = r#"
         {
           "version": 1,
@@ -54,7 +54,7 @@ fn rejects_file_mode_without_hash_key() {
 }
 
 #[test]
-fn rejects_duplicate_token_hashes() {
+fn rejects_duplicate_token() {
     let data = r#"
         {
           "version": 1,
