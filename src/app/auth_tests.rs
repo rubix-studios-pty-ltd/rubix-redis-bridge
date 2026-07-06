@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -7,7 +7,7 @@ use axum::response::IntoResponse;
 
 use crate::app::error::ApiError;
 use crate::client::TrustedProxies;
-use crate::config::{BridgeConfig, RedisTargetConfig};
+use crate::config::{AuthToken, Bridge, RedisTarget, TokenHash};
 use crate::security::SecurityPolicy;
 
 use super::AppState;
@@ -30,24 +30,26 @@ fn error_status(error: ApiError) -> StatusCode {
 }
 
 fn test_state(auth_lockout_failures: usize) -> AppState {
-    let mut targets = HashMap::new();
-
-    targets.insert(
-        "valid-token".to_string(),
-        RedisTargetConfig {
-            rrb_id: "test_redis".to_string(),
-            connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
-            max_connections: 1,
-        },
-    );
+    let targets = vec![RedisTarget {
+        rrb_id: "test_redis".to_string(),
+        connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
+        max_connections: 1,
+        tokens: vec![AuthToken {
+            id: "test_token".to_string(),
+            name: Some("Test token".to_string()),
+            hash: TokenHash::sha256("valid-token"),
+            enabled: true,
+        }],
+    }];
 
     let mut allowed_commands = HashSet::new();
     allowed_commands.insert("PING".to_string());
 
-    AppState::new(BridgeConfig {
+    AppState::new(Bridge {
         host: "127.0.0.1".to_string(),
         port: 8080,
         targets,
+        hash_token: None,
         security: SecurityPolicy {
             allowed_commands,
             blocked_commands: HashSet::new(),
@@ -63,6 +65,51 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
         max_response_bytes: 1024 * 1024,
         metrics_token: Some("metrics-token".to_string()),
         auth_lockout_failures,
+        auth_lockout_window: Duration::from_secs(60),
+        auth_lockout_duration: Duration::from_secs(300),
+        auth_lockout_max_entries: 1024,
+        trust_proxy_headers: false,
+        trusted_proxies: TrustedProxies::default(),
+    })
+    .unwrap()
+}
+
+fn test_hmac() -> AppState {
+    let targets = vec![RedisTarget {
+        rrb_id: "test_redis".to_string(),
+        connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
+        max_connections: 1,
+        tokens: vec![AuthToken {
+            id: "test_token".to_string(),
+            name: Some("Test token".to_string()),
+            hash: TokenHash::hmac_sha256("hash-key", "valid-token"),
+            enabled: true,
+        }],
+    }];
+
+    let mut allowed_commands = HashSet::new();
+    allowed_commands.insert("PING".to_string());
+
+    AppState::new(Bridge {
+        host: "127.0.0.1".to_string(),
+        port: 8080,
+        targets,
+        hash_token: Some("hash-key".to_string()),
+        security: SecurityPolicy {
+            allowed_commands,
+            blocked_commands: HashSet::new(),
+            max_pipeline_commands: 10,
+            max_command_args: 16,
+            max_arg_bytes: 1024,
+            upstash_ratelimit: false,
+        },
+        max_body_bytes: 1024,
+        max_concurrency: 16,
+        request_timeout: Duration::from_millis(500),
+        acquire_timeout: Duration::from_millis(100),
+        max_response_bytes: 1024 * 1024,
+        metrics_token: Some("metrics-token".to_string()),
+        auth_lockout_failures: 3,
         auth_lockout_window: Duration::from_secs(60),
         auth_lockout_duration: Duration::from_secs(300),
         auth_lockout_max_entries: 1024,
@@ -210,4 +257,13 @@ fn lockout_returns_unauthorized() {
             StatusCode::UNAUTHORIZED
         );
     }
+}
+
+#[test]
+fn accepts_hmac_hashed_token() {
+    let state = test_hmac();
+    let ip = ip("203.0.113.10");
+    let valid_headers = auth_headers("valid-token");
+
+    assert!(state.bridge_auth(&valid_headers, ip).is_ok());
 }

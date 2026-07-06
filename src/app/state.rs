@@ -10,27 +10,29 @@ use redis::aio::ConnectionManager;
 use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use crate::client::TrustedProxies;
-use crate::config::{BridgeConfig, RedisTargetConfig};
+use crate::config::{Bridge, RedisTarget as RedisConfig, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
 use super::lockout::AuthLockout;
 
 pub struct AppState {
-    pub(crate) targets: HashMap<String, Arc<RedisTarget>>,
+    pub(crate) targets: Vec<Arc<RedisTarget>>,
+    pub(crate) token_routes: HashMap<TokenHash, Arc<RedisTarget>>,
     pub(crate) security: SecurityPolicy,
     pub(crate) request_timeout: Duration,
     pub(crate) acquire_timeout: Duration,
     pub(crate) max_response_bytes: usize,
     pub(crate) metrics: Metrics,
     pub(crate) metrics_token: Option<String>,
+    pub(crate) hash_token: Option<String>,
     pub(crate) auth_lockout: AuthLockout,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) trusted_proxies: TrustedProxies,
 }
 
 pub(crate) struct RedisTarget {
-    pub(crate) config: RedisTargetConfig,
+    pub(crate) config: RedisConfig,
     connection: OnceCell<ConnectionManager>,
     operation_limit: Semaphore,
 }
@@ -64,33 +66,43 @@ impl fmt::Debug for RedisTarget {
 }
 
 impl AppState {
-    pub fn new(config: BridgeConfig) -> anyhow::Result<Self> {
-        let targets: HashMap<String, Arc<RedisTarget>> = config
-            .targets
-            .into_iter()
-            .map(|(token, target_config)| {
-                (
-                    token,
-                    Arc::new(RedisTarget {
-                        operation_limit: Semaphore::new(target_config.max_connections),
-                        config: target_config,
-                        connection: OnceCell::new(),
-                    }),
-                )
-            })
-            .collect();
+    pub fn new(config: Bridge) -> anyhow::Result<Self> {
+        let mut targets = Vec::with_capacity(config.targets.len());
+        let mut token_routes = HashMap::new();
+
+        for target_config in config.targets {
+            let target = Arc::new(RedisTarget {
+                operation_limit: Semaphore::new(target_config.max_connections),
+                config: target_config,
+                connection: OnceCell::new(),
+            });
+
+            for token in &target.config.tokens {
+                if token.enabled
+                    && token_routes
+                        .insert(token.hash.clone(), target.clone())
+                        .is_some()
+                {
+                    anyhow::bail!("Duplicate enabled token hash configured");
+                }
+            }
+
+            targets.push(target);
+        }
 
         let metrics = Metrics::new()?;
         metrics.configured_targets.set(targets.len() as i64);
 
         Ok(Self {
             targets,
+            token_routes,
             security: config.security,
             request_timeout: config.request_timeout,
             acquire_timeout: config.acquire_timeout,
             max_response_bytes: config.max_response_bytes,
             metrics,
             metrics_token: config.metrics_token,
+            hash_token: config.hash_token,
             auth_lockout: AuthLockout::new(
                 config.auth_lockout_failures,
                 config.auth_lockout_window,

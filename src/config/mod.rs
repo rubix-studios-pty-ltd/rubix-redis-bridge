@@ -1,12 +1,11 @@
 mod env;
 mod targets;
+mod token_hash;
 
-use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 
 use anyhow::bail;
-use serde::Deserialize;
 
 use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
@@ -18,11 +17,14 @@ use self::env::{
 };
 use self::targets::load_targets;
 
+pub use self::token_hash::TokenHash;
+
 #[derive(Clone)]
-pub struct BridgeConfig {
+pub struct Bridge {
     pub host: String,
     pub port: u16,
-    pub targets: HashMap<String, RedisTargetConfig>,
+    pub targets: Vec<RedisTarget>,
+    pub hash_token: Option<String>,
     pub security: SecurityPolicy,
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
@@ -38,19 +40,26 @@ pub struct BridgeConfig {
     pub trusted_proxies: TrustedProxies,
 }
 
-#[derive(Clone, Deserialize)]
-pub struct RedisTargetConfig {
-    #[serde(default = "default_rrb_id")]
+#[derive(Clone)]
+pub struct RedisTarget {
     pub rrb_id: String,
     pub connection_string: String,
-    #[serde(default = "default_max_connections")]
     pub max_connections: usize,
+    pub tokens: Vec<AuthToken>,
 }
 
-impl fmt::Debug for BridgeConfig {
+#[derive(Clone)]
+pub struct AuthToken {
+    pub id: String,
+    pub name: Option<String>,
+    pub hash: TokenHash,
+    pub enabled: bool,
+}
+
+impl fmt::Debug for Bridge {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BridgeConfig")
+            .debug_struct("Bridge")
             .field("host", &self.host)
             .field("port", &self.port)
             .field("target_count", &self.targets.len())
@@ -71,18 +80,31 @@ impl fmt::Debug for BridgeConfig {
     }
 }
 
-impl fmt::Debug for RedisTargetConfig {
+impl fmt::Debug for RedisTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("RedisTargetConfig")
+            .debug_struct("RedisTarget")
             .field("rrb_id", &self.rrb_id)
             .field("connection_string", &"[redacted]")
             .field("max_connections", &self.max_connections)
+            .field("token_count", &self.tokens.len())
             .finish()
     }
 }
 
-impl BridgeConfig {
+impl fmt::Debug for AuthToken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AuthToken")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("hash", &self.hash)
+            .field("enabled", &self.enabled)
+            .finish()
+    }
+}
+
+impl Bridge {
     pub fn from_env() -> anyhow::Result<Self> {
         let host = env_or("RRB_HOST", "0.0.0.0");
         let port = parse_env_or_default("RRB_PORT", 8080)?;
@@ -186,15 +208,25 @@ impl BridgeConfig {
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
 
+        let mode = env_or("RRB_MODE", "file");
         let targets = load_targets()?;
         if targets.is_empty() {
             bail!("No Redis targets configured");
         }
 
+        let hash_token = if mode == "file" {
+            env_first(&["RRB_HASH_TOKEN"])
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        } else {
+            None
+        };
+
         Ok(Self {
             host,
             port,
             targets,
+            hash_token,
             security,
             max_body_bytes,
             max_concurrency,
@@ -210,10 +242,6 @@ impl BridgeConfig {
             trusted_proxies,
         })
     }
-}
-
-fn default_rrb_id() -> String {
-    "redis_target".to_string()
 }
 
 fn default_max_connections() -> usize {

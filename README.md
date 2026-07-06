@@ -1,6 +1,6 @@
 # Rubix Redis Bridge
 
-Rubix Redis Bridge is a Rust HTTP bridge for Redis.
+Rubix Redis Bridge is a Rust HTTP bridge for Redis and Redis-compatible backends.
 
 It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that should not connect to Redis over TCP.
 
@@ -123,7 +123,7 @@ Use `POST /pipeline` for non-atomic batches.
 
 Use `POST /multi-exec` for managed transactions. Raw `MULTI`, `EXEC`, `WATCH`, `UNWATCH`, and `DISCARD` are blocked because they alter connection state on shared Redis connections.
 
-## SDK compatibility
+## Upstash SDK
 
 Rubix Redis Bridge has been tested with `@upstash/redis` across the supported command surface, including single commands, pipelines, managed transactions, and pipeline error handling.
 
@@ -146,6 +146,18 @@ Restricted allowlist example:
 RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
 ```
 
+## Backend
+
+Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibility depends on the backend implementation, the configured command allowlist, and whether Lua/script commands are required.
+
+| Backend | Status | Tested | Notes |
+| --- | --- | --- | --- |
+| Redis | Supported | Standard commands, pipelines, managed transactions, Lua/script profile, validation, metrics | Primary backend target |
+| Valkey | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Dragonfly | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Kvrocks | Supported | Standard commands, pipelines, Lua/script profile, validation, metrics | Confirmed compatible backend |
+| Garnet | Partial | Standard commands, pipelines, Lua/script profile, validation, metrics | Lua/script tests failed; Upstash Ratelimit unsupported |
+
 ## Upstash Ratelimit
 
 `RRB_UPSTASH_RATELIMIT=true` is a trust escalation. It allows the bridge policy to admit `EVAL`, `EVALSHA`, and restricted `SCRIPT` commands when they are also included in `RRB_ALLOWED_COMMANDS`. Those commands execute server-side Lua and should be treated as dangerous outside a controlled deployment.
@@ -165,7 +177,7 @@ When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy w
 
 `SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
 
-Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, or weakly authenticated callers.
+Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weakly authenticated callers, or backends that have not passed the bridge Lua/script tests.
 
 ## Command policy
 
@@ -226,6 +238,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_PORT` | `8080` | Bind port |
 | `RRB_MODE` | `file` | `env` or `file` |
 | `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
+| `RRB_HASH_TOKEN` | none | HMAC-SHA256 key for file-mode token hashes |
 | `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
 | `RRB_UPSTASH_RATELIMIT` | `false` | Enables ratelimit compatibility |
 | `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Auth failures before lockout |
@@ -298,20 +311,46 @@ Example:
 
 ```json
 {
-  "token-one": {
-    "rrb_id": "primary_redis",
-    "connection_string": "redis://default:password@redis:6379",
-    "max_connections": 100
-  },
-  "token-two": {
-    "rrb_id": "secondary_redis",
-    "connection_string": "redis://default:password@redis-two:6379",
-    "max_connections": 50
-  }
+  "version": 1,
+  "targets": [
+    {
+      "rrb_id": "primary_redis",
+      "connection_string": "redis://default:password@redis:6379",
+      "max_connections": 100,
+      "tokens": [
+        {
+          "id": "primary_app",
+          "name": "Production app token",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "rrb_id": "secondary_redis",
+      "connection_string": "redis://default:password@redis-two:6379",
+      "max_connections": 50,
+      "tokens": [
+        {
+          "id": "secondary_app",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "enabled": true
+        }
+      ]
+    }
+  ]
 }
 ```
 
-The JSON object key is the bearer token. `max_connections` sets the target operation cap.
+The client receives only the opaque bearer token. `rrb_id` and token `id` remain internal configuration values. They are not returned in Redis responses.
+
+File mode always uses HMAC-SHA256. Set `RRB_HASH_TOKEN` and generate the stored hash from the full opaque token:
+
+```bash
+printf '%s' "$RRB_TOKEN" | openssl dgst -sha256 -hmac "$RRB_HASH_TOKEN" -binary | xxd -p -c 256
+```
+
+Store only the 64-character hex digest.
 
 Keep the file private and mount it read-only:
 
@@ -320,8 +359,6 @@ chmod 600 tokens.json
 ```
 
 The bridge logs a warning when the token file is publicly accessible.
-
-If `rrb_id` is omitted, the bridge derives a redacted target id for logs and metrics.
 
 ## Health and metrics
 
