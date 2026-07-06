@@ -141,7 +141,7 @@ RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,D
 Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibility depends on the backend implementation, the configured command allowlist, and whether Lua/script commands are required.
 
 | Backend | Status | Notes |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | Redis | Supported | Primary backend |
 | Valkey | Supported | Compatible backend |
 | Dragonfly | Supported | Compatible backend |
