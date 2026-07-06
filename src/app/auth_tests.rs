@@ -33,7 +33,7 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
     let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
-        max_connections: 1,
+        operation_limit: 1,
         connection_shards: 1,
         tokens: vec![AuthToken {
             id: "test_token".to_string(),
@@ -79,7 +79,7 @@ fn test_hmac() -> AppState {
     let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
-        max_connections: 1,
+        operation_limit: 1,
         connection_shards: 1,
         tokens: vec![AuthToken {
             id: "test_token".to_string(),

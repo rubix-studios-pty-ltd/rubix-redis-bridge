@@ -1,16 +1,42 @@
-.git
-.github
+# Source
+.git/
 .gitignore
-.env*
+
+# Build
+target/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
 *.log
-docs
-node_modules
-target
+logs/
 
-biome.json
-package.json
-pnpm-lock.yaml
-token.example.json
+# Scripts
+scripts/
 
+# Documentation
+docs/
+README.md
+CHANGELOG.md
 CODE_OF_CONDUCT.md
 SECURITY.md
+.git-cliff.toml
+cliff.toml
+deny.toml
+release.toml
+biome.json
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose*.yml

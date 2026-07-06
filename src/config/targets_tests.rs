@@ -9,7 +9,7 @@ fn parses_file_targets() {
             {
               "rrb_id": "primary_redis",
               "connection_string": "redis://default:password@redis:6379",
-              "max_connections": 100,
+              "operation_limit": 100,
               "connection_shards": 8,
               "tokens": [
                 {
@@ -26,7 +26,7 @@ fn parses_file_targets() {
 
     assert_eq!(targets.len(), 1);
     assert_eq!(targets[0].rrb_id, "primary_redis");
-    assert_eq!(targets[0].max_connections, 100);
+    assert_eq!(targets[0].operation_limit, 100);
     assert_eq!(targets[0].connection_shards, 8);
     assert_eq!(targets[0].tokens.len(), 1);
     assert!(targets[0].tokens[0].enabled);

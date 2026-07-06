@@ -4,7 +4,7 @@
     {
       "rrb_id": "primary_redis",
       "connection_string": "redis://default:replace-with-redis-password@redis:6379",
-      "max_connections": 100,
+      "operation_limit": 100,
       "connection_shards": 4,
       "tokens": [
         {

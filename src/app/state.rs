@@ -60,10 +60,9 @@ impl fmt::Debug for RedisTarget {
             .debug_struct("RedisTarget")
             .field("rrb_id", &self.config.rrb_id)
             .field("connection_string", &"[redacted]")
-            .field("max_connections", &self.config.max_connections)
+            .field("operation_limit", &self.config.operation_limit)
             .field("connection_shards", &self.config.connection_shards)
             .field("connections_initialized", &self.connections_initialized())
-            .field("operation_limit", &self.config.max_connections)
             .finish()
     }
 }
@@ -74,9 +73,9 @@ impl AppState {
         let mut token_routes = HashMap::new();
 
         for target_config in config.targets {
-            if target_config.max_connections == 0 {
+            if target_config.operation_limit == 0 {
                 anyhow::bail!(
-                    "Redis target {} has max_connections=0",
+                    "Redis target {} has operation_limit=0",
                     target_config.rrb_id
                 );
             }
@@ -94,7 +93,7 @@ impl AppState {
                 .collect();
 
             let target = Arc::new(RedisTarget {
-                operation_limit: Semaphore::new(target_config.max_connections),
+                operation_limit: Semaphore::new(target_config.operation_limit),
                 connections,
                 next_connection: AtomicUsize::new(0),
                 config: target_config,
