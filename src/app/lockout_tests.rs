@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use super::{AuthFailureResult, AuthLockout};
+use super::{AuthFailure, AuthLockout};
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
@@ -11,12 +11,12 @@ fn lockout() -> AuthLockout {
     AuthLockout::new(3, Duration::from_secs(60), Duration::from_secs(300), 1024)
 }
 
-fn assert_locked(result: AuthFailureResult) {
-    assert!(matches!(result, AuthFailureResult::Locked));
+fn assert_locked(result: AuthFailure) {
+    assert!(matches!(result, AuthFailure::Locked));
 }
 
-fn assert_not_locked(result: AuthFailureResult) {
-    assert!(!matches!(result, AuthFailureResult::Locked));
+fn assert_not_locked(result: AuthFailure) {
+    assert!(!matches!(result, AuthFailure::Locked));
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn keep_locked_additional_failures() {
 
     assert_eq!(
         lockout.record_failure_at(ip, now + Duration::from_secs(3)),
-        AuthFailureResult::AlreadyLocked
+        AuthFailure::AlreadyLocked
     );
 
     assert!(lockout.is_locked_at(ip, now + Duration::from_secs(4)));

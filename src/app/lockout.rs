@@ -6,14 +6,14 @@ use std::time::{Duration, Instant};
 use tracing::warn;
 
 #[derive(Debug)]
-struct AuthFailureState {
+struct AuthState {
     failures: usize,
     window_started_at: Instant,
     last_seen_at: Instant,
     locked_until: Option<Instant>,
 }
 
-impl AuthFailureState {
+impl AuthState {
     fn new(now: Instant) -> Self {
         Self {
             failures: 0,
@@ -39,7 +39,7 @@ impl AuthFailureState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AuthFailureResult {
+pub(crate) enum AuthFailure {
     Disabled,
     Tracked,
     Locked,
@@ -48,7 +48,7 @@ pub(crate) enum AuthFailureResult {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct AuthLockoutSnapshot {
+pub(crate) struct AuthSnapshot {
     pub(crate) tracked_ips: usize,
     pub(crate) locked_ips: usize,
 }
@@ -59,7 +59,7 @@ pub(crate) struct AuthLockout {
     failure_window: Duration,
     lockout_duration: Duration,
     max_entries: usize,
-    entries: Mutex<HashMap<IpAddr, AuthFailureState>>,
+    entries: Mutex<HashMap<IpAddr, AuthState>>,
 }
 
 impl AuthLockout {
@@ -98,13 +98,13 @@ impl AuthLockout {
             .is_some_and(|until| until > now)
     }
 
-    pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailureResult {
+    pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailure {
         self.record_failure_at(ip, Instant::now())
     }
 
-    fn record_failure_at(&self, ip: IpAddr, now: Instant) -> AuthFailureResult {
+    fn record_failure_at(&self, ip: IpAddr, now: Instant) -> AuthFailure {
         if !self.is_enabled() {
-            return AuthFailureResult::Disabled;
+            return AuthFailure::Disabled;
         }
 
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
@@ -119,17 +119,17 @@ impl AuthLockout {
                     "Auth lockout entry limit reached; not tracking new failed client IP"
                 );
 
-                return AuthFailureResult::EntryLimitReached;
+                return AuthFailure::EntryLimitReached;
             }
         }
 
         let state = entries
             .entry(ip)
-            .or_insert_with(|| AuthFailureState::new(now));
+            .or_insert_with(|| AuthState::new(now));
 
         if let Some(until) = state.locked_until {
             if until > now {
-                return AuthFailureResult::AlreadyLocked;
+                return AuthFailure::AlreadyLocked;
             }
 
             state.reset_window(now);
@@ -154,10 +154,10 @@ impl AuthLockout {
                 "Client IP locked out after failed authentication attempts"
             );
 
-            return AuthFailureResult::Locked;
+            return AuthFailure::Locked;
         }
 
-        AuthFailureResult::Tracked
+        AuthFailure::Tracked
     }
 
     pub(crate) fn record_success(&self, ip: IpAddr) {
@@ -169,13 +169,13 @@ impl AuthLockout {
         entries.remove(&ip);
     }
 
-    pub(crate) fn snapshot(&self) -> AuthLockoutSnapshot {
+    pub(crate) fn snapshot(&self) -> AuthSnapshot {
         self.snapshot_at(Instant::now())
     }
 
-    fn snapshot_at(&self, now: Instant) -> AuthLockoutSnapshot {
+    fn snapshot_at(&self, now: Instant) -> AuthSnapshot {
         if !self.is_enabled() {
-            return AuthLockoutSnapshot {
+            return AuthSnapshot {
                 tracked_ips: 0,
                 locked_ips: 0,
             };
@@ -190,14 +190,14 @@ impl AuthLockout {
             .filter(|state| matches!(state.locked_until, Some(until) if until > now))
             .count();
 
-        AuthLockoutSnapshot {
+        AuthSnapshot {
             tracked_ips: entries.len(),
             locked_ips,
         }
     }
 
     fn cleanup_stale_entries(
-        entries: &mut HashMap<IpAddr, AuthFailureState>,
+        entries: &mut HashMap<IpAddr, AuthState>,
         now: Instant,
         failure_window: Duration,
     ) {
