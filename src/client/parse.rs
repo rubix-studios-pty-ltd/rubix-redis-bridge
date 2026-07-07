@@ -43,7 +43,3 @@ pub(crate) fn prefix_mask_v6(prefix: u8) -> u128 {
 
     u128::MAX << (128 - prefix)
 }
-
-#[cfg(test)]
-#[path = "parse_tests.rs"]
-mod tests;

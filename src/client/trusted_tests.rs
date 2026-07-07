@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use axum::http::{HeaderMap, HeaderValue};
 
-use super::TrustedProxies;
+use super::trusted::TrustedProxies;
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
