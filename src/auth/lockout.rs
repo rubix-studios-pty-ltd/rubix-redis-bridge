@@ -82,22 +82,6 @@ impl AuthLockout {
         self.max_failures > 0
     }
 
-    #[cfg(test)]
-    pub(crate) fn is_locked_at(&self, ip: IpAddr, now: Instant) -> bool {
-        if !self.is_enabled() {
-            return false;
-        }
-
-        let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
-
-        Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
-
-        entries
-            .get(&ip)
-            .and_then(|state| state.locked_until)
-            .is_some_and(|until| until > now)
-    }
-
     pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailure {
         self.record_failure_at(ip, Instant::now())
     }
@@ -200,6 +184,22 @@ impl AuthLockout {
         failure_window: Duration,
     ) {
         entries.retain(|_, state| !state.is_stale(now, failure_window));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_locked_at(&self, ip: IpAddr, now: Instant) -> bool {
+        if !self.is_enabled() {
+            return false;
+        }
+
+        let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
+
+        Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
+
+        entries
+            .get(&ip)
+            .and_then(|state| state.locked_until)
+            .is_some_and(|until| until > now)
     }
 
     #[cfg(test)]
