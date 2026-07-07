@@ -269,7 +269,7 @@ fn accepts_hmac_hashed_token() {
 }
 
 #[test]
-fn realtime_only_token_rejects_command_route() {
+fn rejects_standard_commands_realtime() {
     let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
