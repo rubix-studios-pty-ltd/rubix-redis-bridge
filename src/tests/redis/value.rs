@@ -2,7 +2,7 @@ use num_bigint::BigInt;
 use redis::{PushKind, Value as RedisValue, VerbatimFormat};
 use serde_json::{Value, json};
 
-use super::redis_value::RedisJson;
+use crate::redis::RedisJson;
 
 fn bulk(value: &str) -> RedisValue {
     RedisValue::BulkString(value.as_bytes().to_vec())

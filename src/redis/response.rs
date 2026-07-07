@@ -2,7 +2,7 @@ use redis::Value;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
-use super::redis_value::RedisJson;
+use super::value::RedisJson;
 
 pub(crate) enum RedisResponse {
     Result(Value),

@@ -4,6 +4,7 @@ mod client;
 mod commands;
 mod config;
 mod metrics;
+mod redis;
 mod security;
 
 use std::net::SocketAddr;

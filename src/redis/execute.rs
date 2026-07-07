@@ -7,13 +7,12 @@ use redis::aio::ConnectionManager;
 use tokio::time::timeout;
 use tracing::{error, warn};
 
+use crate::app::{ApiError, RedisTarget};
 use crate::metrics::Metrics;
 use crate::security::RedisCommand;
 
-use super::error::ApiError;
-use super::redis_error::{redis_api_error, redis_error_message};
-use super::redis_response::RedisResponse;
-use super::state::RedisTarget;
+use super::error::{redis_api_error, redis_error_message};
+use super::response::RedisResponse;
 
 pub(crate) async fn execute_command(
     target: Arc<RedisTarget>,

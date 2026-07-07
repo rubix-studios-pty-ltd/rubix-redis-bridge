@@ -1,7 +1,7 @@
 use redis::RedisError;
 use tracing::error;
 
-use super::error::ApiError;
+use crate::app::ApiError;
 
 pub(crate) fn redis_api_error(error: RedisError) -> ApiError {
     if backend_unavailable(&error) {

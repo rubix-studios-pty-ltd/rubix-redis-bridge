@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use redis::Value;
 
-use super::redis_response::CommandResponse;
-use super::response::serialized_response;
+use crate::app::serialized_response;
+use crate::redis::CommandResponse;
 
 #[test]
 fn allow_size_limit() {
