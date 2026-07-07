@@ -8,7 +8,9 @@ use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
 
 use super::env::{env_first, env_or, parse_env_first};
-use super::{AuthToken, Redis, TokenHash, default_connection_shards, default_operation_limit};
+use super::{
+    AuthToken, Redis, TokenHash, TokenTypes, default_connection_shards, default_operation_limit,
+};
 
 pub(super) fn load_targets() -> anyhow::Result<Vec<Redis>> {
     let mode = env_or("RRB_MODE", "file");
@@ -36,6 +38,11 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
     let connection_shards =
         parse_env_first(&["RRB_CONNECTION_SHARDS"], default_connection_shards())?;
 
+    let token_type = env_first(&["RRB_TOKEN_TYPE"])
+        .map(|value| TokenTypes::parse(&value, "RRB_TOKEN_TYPE"))
+        .transpose()?
+        .unwrap_or_default();
+
     if operation_limit == 0 {
         bail!("RRB_OPERATION_LIMIT must be greater than zero");
     }
@@ -54,6 +61,7 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
             name: Some("Environment token".to_string()),
             hash: TokenHash::sha256(&token),
             enabled: true,
+            token_type,
         }],
     }])
 }
@@ -100,6 +108,8 @@ struct FileAuthToken {
     hash: String,
     #[serde(default = "default_enabled")]
     enabled: bool,
+    #[serde(default)]
+    token_type: Option<String>,
 }
 
 fn default_enabled() -> bool {
@@ -174,6 +184,18 @@ pub(crate) fn parse_file_targets(
                 bail!("Token config file contains duplicate token id: {id}");
             }
 
+            let token_type = token
+                .token_type
+                .as_deref()
+                .map(|value| {
+                    TokenTypes::parse(
+                        value,
+                        &format!("token_type for token {id} on target {rrb_id}"),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_default();
+
             if !token.enabled {
                 tokens.push(AuthToken {
                     id,
@@ -183,6 +205,7 @@ pub(crate) fn parse_file_targets(
                         .filter(|value| !value.is_empty()),
                     hash: TokenHash::hmac_sha256_parse(&token.hash)?,
                     enabled: false,
+                    token_type,
                 });
                 continue;
             }
@@ -201,6 +224,7 @@ pub(crate) fn parse_file_targets(
                     .filter(|value| !value.is_empty()),
                 hash,
                 enabled: true,
+                token_type,
             });
         }
 

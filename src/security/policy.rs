@@ -3,7 +3,9 @@ use std::fmt;
 
 use anyhow::{anyhow, bail};
 
-use super::deny::{is_denied_command, reject_command};
+use crate::config::TokenTypes;
+
+use super::deny::{is_denied_command, ratelimit_commands, reject_command};
 use super::script::validate_subcommand;
 use super::types::{CommandArg, RedisCommand};
 
@@ -14,7 +16,6 @@ pub struct SecurityPolicy {
     pub max_pipeline_commands: usize,
     pub max_command_args: usize,
     pub max_arg_bytes: usize,
-    pub upstash_ratelimit: bool,
 }
 
 impl fmt::Debug for SecurityPolicy {
@@ -26,7 +27,6 @@ impl fmt::Debug for SecurityPolicy {
             .field("max_pipeline_commands", &self.max_pipeline_commands)
             .field("max_command_args", &self.max_command_args)
             .field("max_arg_bytes", &self.max_arg_bytes)
-            .field("upstash_ratelimit", &self.upstash_ratelimit)
             .finish()
     }
 }
@@ -40,7 +40,7 @@ impl SecurityPolicy {
         let hard_denied_allowed = self
             .allowed_commands
             .iter()
-            .filter(|command| is_denied_command(command, self.upstash_ratelimit))
+            .filter(|command| is_denied_command(command, true))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -54,13 +54,18 @@ impl SecurityPolicy {
         Ok(())
     }
 
-    pub fn parse_command(&self, array: &[CommandArg]) -> anyhow::Result<RedisCommand> {
-        self.parse_command_array(array)
+    pub fn parse_command(
+        &self,
+        array: &[CommandArg],
+        token_type: &TokenTypes,
+    ) -> anyhow::Result<RedisCommand> {
+        self.parse_command_array(array, token_type)
     }
 
     pub fn parse_command_list(
         &self,
         commands: &[Vec<CommandArg>],
+        token_type: &TokenTypes,
     ) -> anyhow::Result<Vec<RedisCommand>> {
         if commands.len() > self.max_pipeline_commands {
             bail!(
@@ -71,11 +76,15 @@ impl SecurityPolicy {
 
         commands
             .iter()
-            .map(|command| self.parse_command_array(command))
+            .map(|command| self.parse_command_array(command, token_type))
             .collect()
     }
 
-    fn parse_command_array(&self, array: &[CommandArg]) -> anyhow::Result<RedisCommand> {
+    fn parse_command_array(
+        &self,
+        array: &[CommandArg],
+        token_type: &TokenTypes,
+    ) -> anyhow::Result<RedisCommand> {
         if array.is_empty() {
             bail!("Invalid command array. Command cannot be empty.");
         }
@@ -99,18 +108,25 @@ impl SecurityPolicy {
             bail!("Invalid command array. Command cannot be empty.");
         }
 
-        if command_name == "SCRIPT" && self.upstash_ratelimit {
+        let allow_ratelimit = token_type.allows_ratelimit();
+
+        if command_name == "SCRIPT" && allow_ratelimit {
             validate_subcommand(array)?;
         } else {
-            reject_command(&command_name, self.upstash_ratelimit)?;
+            reject_command(&command_name, allow_ratelimit)?;
         }
 
         if self.allowed_commands.is_empty() {
             bail!("No Redis commands are allowed by policy.");
         }
 
-        if !self.allowed_commands.contains(&command_name) {
-            bail!("Redis command is not allowed: {command_name}");
+        let standard_allowed =
+            token_type.allows_command() && self.allowed_commands.contains(&command_name);
+        let ratelimit_allowed =
+            allow_ratelimit && ratelimit_commands().contains(command_name.as_str());
+
+        if !standard_allowed && !ratelimit_allowed {
+            bail!("Redis command is not allowed for this token type: {command_name}");
         }
 
         if self.blocked_commands.contains(&command_name) {

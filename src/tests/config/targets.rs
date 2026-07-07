@@ -1,4 +1,4 @@
-use crate::config::parse_file_targets;
+use crate::config::{TokenTypes, parse_file_targets};
 
 #[test]
 fn parses_file_targets() {
@@ -30,6 +30,7 @@ fn parses_file_targets() {
     assert_eq!(targets[0].connection_shards, 8);
     assert_eq!(targets[0].tokens.len(), 1);
     assert!(targets[0].tokens[0].enabled);
+    assert_eq!(targets[0].tokens[0].token_type, TokenTypes::default());
 }
 
 #[test]
@@ -122,6 +123,58 @@ fn rejects_zero_connection_shards() {
                 {
                   "id": "primary_app",
                   "hash": "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+                }
+              ]
+            }
+          ]
+        }
+        "#;
+
+    assert!(parse_file_targets(data, Some("hash-key")).is_err());
+}
+
+#[test]
+fn parses_file_token_type() {
+    let data = r#"
+        {
+          "version": 1,
+          "targets": [
+            {
+              "rrb_id": "primary_redis",
+              "connection_string": "redis://default:password@redis:6379",
+              "tokens": [
+                {
+                  "id": "primary_app",
+                  "hash": "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+                  "token_type": "command,ratelimit,realtime"
+                }
+              ]
+            }
+          ]
+        }
+        "#;
+
+    let targets = parse_file_targets(data, Some("hash-key")).unwrap();
+
+    assert!(targets[0].tokens[0].token_type.allows_command());
+    assert!(targets[0].tokens[0].token_type.allows_ratelimit());
+    //    assert!(targets[0].tokens[0].token_type.allows_realtime());
+}
+
+#[test]
+fn rejects_invalid_file_token_type() {
+    let data = r#"
+        {
+          "version": 1,
+          "targets": [
+            {
+              "rrb_id": "primary_redis",
+              "connection_string": "redis://default:password@redis:6379",
+              "tokens": [
+                {
+                  "id": "primary_app",
+                  "hash": "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+                  "token_type": "admin"
                 }
               ]
             }

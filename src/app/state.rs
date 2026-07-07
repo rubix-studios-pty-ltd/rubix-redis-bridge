@@ -12,13 +12,13 @@ use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
-use crate::config::{Bridge, Redis, TokenHash};
+use crate::config::{Bridge, Redis, TokenHash, TokenTypes};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
 pub struct AppState {
     pub(crate) targets: Vec<Arc<RedisTarget>>,
-    pub(crate) token_routes: HashMap<TokenHash, Arc<RedisTarget>>,
+    pub(crate) token_routes: HashMap<TokenHash, AuthRoute>,
     pub(crate) security: SecurityPolicy,
     pub(crate) request_timeout: Duration,
     pub(crate) acquire_timeout: Duration,
@@ -36,6 +36,12 @@ pub(crate) struct RedisTarget {
     connections: Vec<OnceCell<ConnectionManager>>,
     next_connection: AtomicUsize,
     operation_limit: Semaphore,
+}
+
+#[derive(Clone)]
+pub(crate) struct AuthRoute {
+    target: Arc<RedisTarget>,
+    token_type: TokenTypes,
 }
 
 impl fmt::Debug for AppState {
@@ -62,6 +68,16 @@ impl fmt::Debug for RedisTarget {
             .field("operation_limit", &self.config.operation_limit)
             .field("connection_shards", &self.config.connection_shards)
             .field("connections_initialized", &self.connections_initialized())
+            .finish()
+    }
+}
+
+impl fmt::Debug for AuthRoute {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AuthRoute")
+            .field("target", &self.target.id())
+            .field("token_type", &self.token_type)
             .finish()
     }
 }
@@ -101,7 +117,13 @@ impl AppState {
             for token in &target.config.tokens {
                 if token.enabled
                     && token_routes
-                        .insert(token.hash.clone(), target.clone())
+                        .insert(
+                            token.hash.clone(),
+                            AuthRoute {
+                                target: target.clone(),
+                                token_type: token.token_type.clone(),
+                            },
+                        )
                         .is_some()
                 {
                     anyhow::bail!("Duplicate enabled token hash configured");
@@ -182,6 +204,24 @@ impl AppState {
             })
             .unwrap_or(false)
     }
+}
+
+impl AuthRoute {
+    pub(crate) fn target(&self) -> Arc<RedisTarget> {
+        self.target.clone()
+    }
+
+    pub(crate) fn allows_command_route(&self) -> bool {
+        self.token_type.allows_command_route()
+    }
+
+    pub(crate) fn token_type(&self) -> &TokenTypes {
+        &self.token_type
+    }
+
+    //    pub(crate) fn allows_realtime(&self) -> bool {
+    //        self.token_type.allows_realtime()
+    //    }
 }
 
 impl RedisTarget {

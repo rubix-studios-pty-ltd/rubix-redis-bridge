@@ -11,6 +11,7 @@
           "id": "primary_app",
           "name": "Primary application token",
           "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "token_type": "command,ratelimit,realtime",
           "enabled": true
         }
       ]

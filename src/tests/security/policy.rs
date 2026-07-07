@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use serde_json::{Value, json};
 
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
-
+use crate::config::TokenTypes;
 use crate::security::{CommandArg, SecurityPolicy};
-use crate::security::{denied_commands, is_denied_command};
+use crate::security::{denied_commands, is_denied_command, ratelimit_commands};
 
 fn policy() -> SecurityPolicy {
     SecurityPolicy {
@@ -14,17 +14,29 @@ fn policy() -> SecurityPolicy {
         max_pipeline_commands: 10,
         max_command_args: 4,
         max_arg_bytes: 16,
-        upstash_ratelimit: false,
     }
 }
 
 fn ratelimit_policy() -> SecurityPolicy {
     let mut policy = policy();
 
-    policy.upstash_ratelimit = true;
-    policy.allowed_commands.insert("SCRIPT".to_string());
+    for command in ratelimit_commands() {
+        policy.allowed_commands.insert(command.to_string());
+    }
 
     policy
+}
+
+fn command_token() -> TokenTypes {
+    TokenTypes::parse("command", "test").unwrap()
+}
+
+fn ratelimit_token() -> TokenTypes {
+    TokenTypes::parse("ratelimit", "test").unwrap()
+}
+
+fn command_ratelimit_token() -> TokenTypes {
+    TokenTypes::parse("command,ratelimit", "test").unwrap()
 }
 
 fn command(value: Value) -> Vec<CommandArg> {
@@ -32,8 +44,17 @@ fn command(value: Value) -> Vec<CommandArg> {
 }
 
 fn error_contains(policy: &SecurityPolicy, value: Value, expected: &str) {
+    error_contains_for(policy, value, expected, &command_token());
+}
+
+fn error_contains_for(
+    policy: &SecurityPolicy,
+    value: Value,
+    expected: &str,
+    token_type: &TokenTypes,
+) {
     let command = command(value);
-    let err = policy.parse_command(&command).unwrap_err();
+    let err = policy.parse_command(&command, token_type).unwrap_err();
     let message = err.to_string();
 
     assert!(
@@ -88,6 +109,11 @@ fn reject_denied_commands_in_allowlist() {
 }
 
 #[test]
+fn allow_ratelimit_commands_in_allowlist() {
+    assert!(ratelimit_policy().validate().is_ok());
+}
+
+#[test]
 fn reject_empty_allowlist() {
     let mut policy = policy();
 
@@ -113,7 +139,7 @@ fn accept_valid_command_when_arg_max() {
 
     assert!(
         policy
-            .parse_command(&command(json!(["GET", "key"])))
+            .parse_command(&command(json!(["GET", "key"])), &command_token())
             .is_ok()
     );
 }
@@ -130,9 +156,52 @@ fn accept_ratelimit_profile() {
 }
 
 #[test]
+fn reject_ratelimit_commands_without_ratelimit_token_type() {
+    let policy = ratelimit_policy();
+
+    for command in ["EVAL", "EVALSHA", "SCRIPT"] {
+        error_contains_for(&policy, json!([command]), "hard-denied", &command_token());
+    }
+}
+
+#[test]
+fn ratelimit_only_token_rejects_standard_commands() {
+    error_contains_for(
+        &policy(),
+        json!(["GET", "key"]),
+        "not allowed for this token type",
+        &ratelimit_token(),
+    );
+}
+
+#[test]
+fn accept_ratelimit_eval() {
+    let command = ratelimit_policy()
+        .parse_command(&command(json!(["EVAL", "return 1", 0])), &ratelimit_token())
+        .unwrap();
+
+    assert_eq!(command.name, "EVAL");
+}
+
+#[test]
+fn accept_ratelimit_evalsha() {
+    let command = ratelimit_policy()
+        .parse_command(
+            &command(json!(["EVALSHA", "abc123", 0])),
+            &ratelimit_token(),
+        )
+        .unwrap();
+
+    assert_eq!(command.name, "EVALSHA");
+}
+
+#[test]
 fn accept_ratelimit_script_flush() {
     let command = ratelimit_policy()
-        .parse_command(&command(json!(["SCRIPT", "FLUSH"])))
+        .parse_command(
+            &command(json!(["SCRIPT", "FLUSH"])),
+            &command_ratelimit_token(),
+        )
         .unwrap();
 
     assert_eq!(command.name, "SCRIPT");
@@ -141,7 +210,10 @@ fn accept_ratelimit_script_flush() {
 #[test]
 fn accept_ratelimit_script_flush_sync() {
     let command = ratelimit_policy()
-        .parse_command(&command(json!(["SCRIPT", "FLUSH", "SYNC"])))
+        .parse_command(
+            &command(json!(["SCRIPT", "FLUSH", "SYNC"])),
+            &command_ratelimit_token(),
+        )
         .unwrap();
 
     assert_eq!(command.name, "SCRIPT");
@@ -149,18 +221,33 @@ fn accept_ratelimit_script_flush_sync() {
 
 #[test]
 fn reject_ratelimit_script_flush_invalid() {
-    error_contains(
+    error_contains_for(
         &ratelimit_policy(),
         json!(["SCRIPT", "FLUSH", "BAD"]),
         "SYNC or ASYNC",
+        &ratelimit_token(),
     );
 }
 
 #[test]
 fn reject_ratelimit_script_kill() {
-    error_contains(
+    error_contains_for(
         &ratelimit_policy(),
         json!(["SCRIPT", "KILL"]),
         "blocked by bridge policy",
+        &ratelimit_token(),
+    );
+}
+
+#[test]
+fn reject_explicitly_blocked_ratelimit_command() {
+    let mut policy = ratelimit_policy();
+    policy.blocked_commands.insert("EVAL".to_string());
+
+    error_contains_for(
+        &policy,
+        json!(["EVAL", "return 1", 0]),
+        "blocked by policy",
+        &ratelimit_token(),
     );
 }

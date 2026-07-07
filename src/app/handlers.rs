@@ -98,7 +98,7 @@ pub async fn command(
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, client_ip) {
+    let route = match state.command_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => {
             state.metrics().request_denied("command", "auth");
@@ -114,17 +114,22 @@ pub async fn command(
         }
     };
 
-    let command = match state.security().parse_command(&command_body) {
+    let command = match state
+        .security()
+        .parse_command(&command_body, route.token_type())
+    {
         Ok(command) => command,
         Err(error) => {
-            state.metrics().command_denied(target.id(), "single");
+            state
+                .metrics()
+                .command_denied(route.target().id(), "single");
             state.metrics().request_denied("command", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
 
     match execute_command(
-        target,
+        route.target(),
         command,
         state.request_timeout(),
         state.acquire_timeout(),
@@ -157,7 +162,7 @@ pub async fn pipeline(
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, client_ip) {
+    let route = match state.command_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => {
             state.metrics().request_denied("pipeline", "auth");
@@ -173,17 +178,22 @@ pub async fn pipeline(
         }
     };
 
-    let commands = match state.security().parse_command_list(&command_body) {
+    let commands = match state
+        .security()
+        .parse_command_list(&command_body, route.token_type())
+    {
         Ok(commands) => commands,
         Err(error) => {
-            state.metrics().command_denied(target.id(), "pipeline");
+            state
+                .metrics()
+                .command_denied(route.target().id(), "pipeline");
             state.metrics().request_denied("pipeline", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
 
     match execute_pipeline(
-        target,
+        route.target(),
         commands,
         state.request_timeout(),
         state.acquire_timeout(),
@@ -216,7 +226,7 @@ pub async fn multi_exec(
     let base64_encoding = AppState::base64(&headers);
     let client_ip = state.client_ip(&headers, addr);
 
-    let target = match state.bridge_auth(&headers, client_ip) {
+    let route = match state.command_auth(&headers, client_ip) {
         Ok(target) => target,
         Err(error) => {
             state.metrics().request_denied("multi_exec", "auth");
@@ -232,17 +242,22 @@ pub async fn multi_exec(
         }
     };
 
-    let commands = match state.security().parse_command_list(&command_body) {
+    let commands = match state
+        .security()
+        .parse_command_list(&command_body, route.token_type())
+    {
         Ok(commands) => commands,
         Err(error) => {
-            state.metrics().command_denied(target.id(), "multi_exec");
+            state
+                .metrics()
+                .command_denied(route.target().id(), "multi_exec");
             state.metrics().request_denied("multi_exec", "policy");
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
 
     match execute_transaction(
-        target,
+        route.target(),
         commands,
         state.request_timeout(),
         state.acquire_timeout(),
