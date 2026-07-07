@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use super::{AuthFailure, AuthLockout};
+use super::lockout::{AuthFailure, AuthLockout};
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
@@ -76,21 +76,8 @@ fn ignore_ips_lockout_full() {
     assert_not_locked(lockout.record_failure_at(ip("203.0.113.10"), now));
     assert_not_locked(lockout.record_failure_at(ip("203.0.113.11"), now + Duration::from_secs(1)));
 
-    assert!(
-        lockout
-            .entries
-            .lock()
-            .unwrap()
-            .contains_key(&ip("203.0.113.10"))
-    );
-
-    assert!(
-        !lockout
-            .entries
-            .lock()
-            .unwrap()
-            .contains_key(&ip("203.0.113.11"))
-    );
+    assert!(lockout.contains_ip(ip("203.0.113.10")));
+    assert!(!lockout.contains_ip(ip("203.0.113.11")));
 }
 
 #[test]
@@ -101,21 +88,8 @@ fn allow_ips_lockout_cleanup() {
     assert_not_locked(lockout.record_failure_at(ip("203.0.113.10"), now));
     assert_not_locked(lockout.record_failure_at(ip("203.0.113.11"), now + Duration::from_secs(61)));
 
-    assert!(
-        !lockout
-            .entries
-            .lock()
-            .unwrap()
-            .contains_key(&ip("203.0.113.10"))
-    );
-
-    assert!(
-        lockout
-            .entries
-            .lock()
-            .unwrap()
-            .contains_key(&ip("203.0.113.11"))
-    );
+    assert!(!lockout.contains_ip(ip("203.0.113.10")));
+    assert!(lockout.contains_ip(ip("203.0.113.11")));
 }
 
 #[test]
@@ -129,7 +103,7 @@ fn skip_lockout_when_disabled() {
     assert_not_locked(lockout.record_failure_at(ip, now + Duration::from_secs(1)));
     assert_not_locked(lockout.record_failure_at(ip, now + Duration::from_secs(2)));
     assert!(!lockout.is_locked_at(ip, now + Duration::from_secs(3)));
-    assert!(lockout.entries.lock().unwrap().is_empty());
+    assert!(lockout.is_empty());
 }
 
 #[test]

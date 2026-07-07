@@ -83,15 +83,15 @@ impl AuthLockout {
     }
 
     #[cfg(test)]
-    fn is_locked_at(&self, ip: IpAddr, now: Instant) -> bool {
+    pub(crate) fn is_locked_at(&self, ip: IpAddr, now: Instant) -> bool {
         if !self.is_enabled() {
             return false;
         }
-
+    
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
-
+    
         Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
-
+    
         entries
             .get(&ip)
             .and_then(|state| state.locked_until)
@@ -102,7 +102,7 @@ impl AuthLockout {
         self.record_failure_at(ip, Instant::now())
     }
 
-    fn record_failure_at(&self, ip: IpAddr, now: Instant) -> AuthFailure {
+    pub(crate) fn record_failure_at(&self, ip: IpAddr, now: Instant) -> AuthFailure {
         if !self.is_enabled() {
             return AuthFailure::Disabled;
         }
@@ -203,8 +203,20 @@ impl AuthLockout {
     ) {
         entries.retain(|_, state| !state.is_stale(now, failure_window));
     }
-}
 
-#[cfg(test)]
-#[path = "lockout_tests.rs"]
-mod tests;
+    #[cfg(test)]
+    pub(crate) fn contains_ip(&self, ip: IpAddr) -> bool {
+        self.entries
+            .lock()
+            .expect("auth lockout mutex poisoned")
+            .contains_key(&ip)
+    }
+    
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.entries
+            .lock()
+            .expect("auth lockout mutex poisoned")
+            .is_empty()
+    }
+}
