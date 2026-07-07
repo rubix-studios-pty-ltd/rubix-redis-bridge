@@ -52,7 +52,7 @@ async function ratelimitDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge token is running without token_type=ratelimit')
+    t.skip('Bridge is running without token_type=ratelimit')
     return true
   }
 
@@ -67,7 +67,7 @@ async function scriptFlushDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge token is running without SCRIPT FLUSH ratelimit support')
+    t.skip('Bridge is running without SCRIPT FLUSH token_type=ratelimit')
     return true
   }
 
@@ -272,7 +272,7 @@ test('Test(@upstash/redis): unauthorized requests rejected', async () => {
   assert.equal(response.status, 401)
 })
 
-test('Test(@upstash/redis): dangerous commands rejected before execution', async () => {
+test('Test(@upstash/redis): dangerous commands rejected', async () => {
   const result = await rawCommand(['FCALL', 'some_function', 0])
 
   assert.equal(result.status, 400)
@@ -280,7 +280,7 @@ test('Test(@upstash/redis): dangerous commands rejected before execution', async
   assert.match(result.error, /hard-denied|not allowed/i)
 })
 
-test('Test(@upstash/redis): connection-state commands are rejected before execution', async () => {
+test('Test(@upstash/redis): connection-state commands rejected', async () => {
   const result = await rawCommand(['SELECT', '1'])
 
   assert.equal(result.status, 400)
