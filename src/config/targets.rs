@@ -106,7 +106,10 @@ fn default_enabled() -> bool {
     true
 }
 
-fn parse_file_targets(data: &str, hash_token: Option<&str>) -> anyhow::Result<Vec<Redis>> {
+pub(crate) fn parse_file_targets(
+    data: &str,
+    hash_token: Option<&str>,
+) -> anyhow::Result<Vec<Redis>> {
     let _hash_token = hash_token
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -237,7 +240,3 @@ fn file_permissions(path: &str) {
 
 #[cfg(not(unix))]
 fn file_permissions(_path: &str) {}
-
-#[cfg(test)]
-#[path = "targets_tests.rs"]
-mod tests;

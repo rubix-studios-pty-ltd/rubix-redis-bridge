@@ -9,4 +9,4 @@ pub use types::RedisCommand;
 pub(crate) use types::CommandArg;
 
 #[cfg(test)]
-mod tests;
+pub(crate) use deny::{denied_commands, is_denied_command};

@@ -46,7 +46,7 @@ pub(super) fn parse_csv_env_first(keys: &[&str]) -> anyhow::Result<Option<HashSe
     Ok(None)
 }
 
-fn parse_csv(value: &str) -> HashSet<String> {
+pub(crate) fn parse_csv(value: &str) -> HashSet<String> {
     value
         .split(',')
         .map(|item| item.trim().to_ascii_uppercase())
@@ -80,18 +80,4 @@ pub(super) fn env_first(keys: &[&str]) -> Option<String> {
 
 pub(super) fn env_or(key: &str, fallback: impl Into<String>) -> String {
     std::env::var(key).unwrap_or_else(|_| fallback.into())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_csv_commands() {
-        let commands = parse_csv("get, Set , DEL");
-
-        assert!(commands.contains("GET"));
-        assert!(commands.contains("SET"));
-        assert!(commands.contains("DEL"));
-    }
 }

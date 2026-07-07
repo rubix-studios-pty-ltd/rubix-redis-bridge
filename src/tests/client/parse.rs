@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use super::{parse_ip_candidate, prefix_mask_v4, prefix_mask_v6};
+use crate::client::{parse_ip_candidate, prefix_mask_v4, prefix_mask_v6};
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()

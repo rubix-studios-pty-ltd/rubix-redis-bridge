@@ -5,12 +5,10 @@ use std::time::Duration;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 
-use crate::app::error::ApiError;
+use crate::app::{ApiError, AppState};
 use crate::client::TrustedProxies;
 use crate::config::{AuthToken, Bridge, Redis, TokenHash};
 use crate::security::SecurityPolicy;
-
-use super::AppState;
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()

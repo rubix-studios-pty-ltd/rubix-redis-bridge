@@ -110,7 +110,3 @@ impl TrustedProxy {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "trusted_tests.rs"]
-mod tests;

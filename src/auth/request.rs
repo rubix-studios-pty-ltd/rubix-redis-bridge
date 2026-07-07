@@ -4,11 +4,11 @@ use std::sync::Arc;
 use axum::http::HeaderMap;
 use subtle::ConstantTimeEq;
 
+use crate::app::ApiError;
+use crate::app::{AppState, RedisTarget};
 use crate::config::TokenHash;
 
-use super::error::ApiError;
-use super::lockout::AuthFailureResult;
-use super::state::{AppState, RedisTarget};
+use super::lockout::AuthFailure;
 
 impl AppState {
     pub(crate) fn unauthorized(&self, ip: IpAddr, message: impl Into<String>) -> ApiError {
@@ -17,17 +17,17 @@ impl AppState {
         let result = self.auth_lockout.record_failure(ip);
 
         match result {
-            AuthFailureResult::Locked => {
+            AuthFailure::Locked => {
                 self.metrics.lockout_created();
                 self.refresh_lockout_metrics();
                 ApiError::too_many_requests("Too many failed authentication attempts")
             }
-            AuthFailureResult::AlreadyLocked => {
+            AuthFailure::AlreadyLocked => {
                 self.metrics.locked_request();
                 self.refresh_lockout_metrics();
                 ApiError::too_many_requests("Too many failed authentication attempts")
             }
-            AuthFailureResult::EntryLimitReached => {
+            AuthFailure::EntryLimitReached => {
                 self.metrics.lockout_entry_limit();
                 self.refresh_lockout_metrics();
                 ApiError::unauthorized(message)
@@ -106,7 +106,3 @@ impl AppState {
         Ok(target)
     }
 }
-
-#[cfg(test)]
-#[path = "auth_tests.rs"]
-mod tests;

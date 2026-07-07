@@ -10,12 +10,11 @@ use axum::http::HeaderMap;
 use redis::aio::ConnectionManager;
 use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
+use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
 use crate::config::{Bridge, Redis, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
-
-use super::lockout::AuthLockout;
 
 pub struct AppState {
     pub(crate) targets: Vec<Arc<RedisTarget>>,

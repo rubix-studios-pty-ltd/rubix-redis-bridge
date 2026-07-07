@@ -1,4 +1,4 @@
-use super::parse_file_targets;
+use crate::config::parse_file_targets;
 
 #[test]
 fn parses_file_targets() {

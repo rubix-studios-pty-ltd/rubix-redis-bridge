@@ -1,9 +1,7 @@
 use redis::Value as RedisValue;
 use serde_json::json;
 
-use super::redis_response::{
-    CommandResponse, PipelineResponse, RedisResponse, TransactionResponse,
-};
+use crate::redis::{CommandResponse, PipelineResponse, RedisResponse, TransactionResponse};
 
 fn bulk(value: &str) -> RedisValue {
     RedisValue::BulkString(value.as_bytes().to_vec())

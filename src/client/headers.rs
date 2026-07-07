@@ -44,7 +44,3 @@ fn forwarded_header_ip(headers: &HeaderMap) -> Option<IpAddr> {
             })
         })
 }
-
-#[cfg(test)]
-#[path = "headers_tests.rs"]
-mod tests;

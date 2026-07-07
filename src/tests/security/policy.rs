@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
 
-use super::deny::{denied_commands, is_denied_command};
-use super::{CommandArg, SecurityPolicy};
+use crate::security::{CommandArg, SecurityPolicy};
+use crate::security::{denied_commands, is_denied_command};
 
 fn policy() -> SecurityPolicy {
     SecurityPolicy {
