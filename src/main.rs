@@ -118,3 +118,6 @@ async fn shutdown_signal() {
         warn!(%error, "Failed to install ctrl_c signal handler");
     }
 }
+
+#[cfg(test)]
+mod tests;
