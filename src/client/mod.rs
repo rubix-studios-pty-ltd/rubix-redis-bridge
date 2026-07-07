@@ -2,16 +2,6 @@ mod headers;
 mod parse;
 mod trusted;
 
+pub(crate) use headers::forwarded_ip;
+pub(crate) use parse::{parse_ip_candidate, prefix_mask_v4, prefix_mask_v6};
 pub(crate) use trusted::TrustedProxies;
-
-#[cfg(test)]
-#[path = "headers_tests.rs"]
-mod headers_tests;
-
-#[cfg(test)]
-#[path = "parse_tests.rs"]
-mod parse_tests;
-
-#[cfg(test)]
-#[path = "trusted_tests.rs"]
-mod trusted_tests;

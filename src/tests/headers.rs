@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use axum::http::{HeaderMap, HeaderValue};
 
-use super::headers::forwarded_ip;
+use crate::client::forwarded_ip;
 
 fn ip(value: &str) -> IpAddr {
     value.parse().unwrap()
