@@ -1,4 +1,4 @@
-use super::parse_file_targets;
+use super::targets::parse_file_targets;
 
 #[test]
 fn parses_file_targets() {

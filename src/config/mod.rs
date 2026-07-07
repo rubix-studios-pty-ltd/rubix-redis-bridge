@@ -1,6 +1,6 @@
 mod env;
 mod targets;
-mod token_hash;
+mod hash;
 
 use std::fmt;
 use std::time::Duration;
@@ -17,7 +17,7 @@ use self::env::{
 };
 use self::targets::load_targets;
 
-pub use self::token_hash::TokenHash;
+pub use self::hash::TokenHash;
 
 #[derive(Clone)]
 pub struct Bridge {
@@ -253,3 +253,11 @@ fn default_operation_limit() -> usize {
 fn default_connection_shards() -> usize {
     4
 }
+
+#[cfg(test)]
+#[path = "hash_tests.rs"]
+mod hash_tests;
+
+#[cfg(test)]
+#[path = "targets_tests.rs"]
+mod targets_tests;

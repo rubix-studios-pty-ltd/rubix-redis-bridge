@@ -50,6 +50,11 @@ impl TokenHash {
 
         Ok(Self { digest })
     }
+
+    #[cfg(test)]
+    pub(crate) fn config_value(&self) -> String {
+        hex::encode(self.digest)
+    }
 }
 
 impl fmt::Debug for TokenHash {
@@ -61,7 +66,3 @@ impl fmt::Debug for TokenHash {
             .finish()
     }
 }
-
-#[cfg(test)]
-#[path = "token_hash_tests.rs"]
-mod tests;

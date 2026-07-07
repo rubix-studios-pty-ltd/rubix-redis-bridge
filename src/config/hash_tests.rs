@@ -1,10 +1,4 @@
-use super::TokenHash;
-
-impl TokenHash {
-    fn config_value(&self) -> String {
-        hex::encode(self.digest)
-    }
-}
+use super::hash::TokenHash;
 
 #[test]
 fn sha256() {

@@ -1,4 +1,5 @@
 mod app;
+mod auth;
 mod client;
 mod commands;
 mod config;

@@ -4,11 +4,11 @@ use std::sync::Arc;
 use axum::http::HeaderMap;
 use subtle::ConstantTimeEq;
 
+use crate::app::ApiError;
+use crate::app::{AppState, RedisTarget};
 use crate::config::TokenHash;
 
-use super::error::ApiError;
 use super::lockout::AuthFailure;
-use super::state::{AppState, RedisTarget};
 
 impl AppState {
     pub(crate) fn unauthorized(&self, ip: IpAddr, message: impl Into<String>) -> ApiError {
