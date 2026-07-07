@@ -11,13 +11,14 @@ use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
+pub(crate) use hash::TokenHash;
+pub(crate) use targets::parse_file_targets;
+
 use self::env::{
     env_first, env_or, parse_bool_env, parse_command_list, parse_csv_env_first,
     parse_env_or_default,
 };
 use self::targets::load_targets;
-
-pub use self::hash::TokenHash;
 
 #[derive(Clone)]
 pub struct Bridge {
@@ -253,11 +254,3 @@ fn default_operation_limit() -> usize {
 fn default_connection_shards() -> usize {
     4
 }
-
-#[cfg(test)]
-#[path = "hash_tests.rs"]
-mod hash_tests;
-
-#[cfg(test)]
-#[path = "targets_tests.rs"]
-mod targets_tests;

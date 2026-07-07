@@ -1,4 +1,4 @@
-use super::hash::TokenHash;
+use crate::config::TokenHash;
 
 #[test]
 fn sha256() {
