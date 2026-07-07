@@ -43,7 +43,6 @@ function policy(result) {
   )
 }
 
-
 async function ratelimitDisabled(t) {
   const command = await rawCommand(['EVAL', 'return 1', 0])
 
@@ -286,7 +285,6 @@ test('Test(@upstash/redis): connection-state commands rejected', async () => {
   assert.equal(result.status, 400)
   assert.ok(result.error)
 })
-
 
 test('Test(@upstash/ratelimit): fixed window with token_type=ratelimit', async (t) => {
   if (await ratelimitDisabled(t)) {
