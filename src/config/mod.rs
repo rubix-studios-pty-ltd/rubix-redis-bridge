@@ -1,7 +1,7 @@
 mod env;
 mod hash;
 mod targets;
-mod token_type;
+mod token;
 
 use std::fmt;
 use std::time::Duration;
@@ -13,7 +13,7 @@ use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
 pub(crate) use hash::TokenHash;
-pub(crate) use token_type::TokenTypes;
+pub(crate) use token::TokenTypes;
 
 #[cfg(test)]
 pub(crate) use {env::parse_csv, targets::parse_file_targets};
