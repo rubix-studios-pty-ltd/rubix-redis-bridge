@@ -1,11 +1,9 @@
-use std::net::IpAddr;
-use std::sync::Arc;
-
 use axum::http::HeaderMap;
+use std::net::IpAddr;
 use subtle::ConstantTimeEq;
 
 use crate::app::ApiError;
-use crate::app::{AppState, RedisTarget};
+use crate::app::{AppState, AuthRoute};
 use crate::config::TokenHash;
 
 use super::lockout::AuthFailure;
@@ -88,7 +86,7 @@ impl AppState {
         &self,
         headers: &HeaderMap,
         ip: IpAddr,
-    ) -> Result<Arc<RedisTarget>, ApiError> {
+    ) -> Result<AuthRoute, ApiError> {
         let token = self.bearer_token(headers, ip)?;
 
         let token_hash = match self.hash_token.as_deref() {
@@ -96,13 +94,29 @@ impl AppState {
             None => TokenHash::sha256(token),
         };
 
-        let Some(target) = self.token_routes.get(&token_hash).cloned() else {
+        let Some(route) = self.token_routes.get(&token_hash).cloned() else {
             return Err(self.unauthorized(ip, "Invalid token"));
         };
 
         self.auth_lockout.record_success(ip);
         self.refresh_lockout_metrics();
 
-        Ok(target)
+        Ok(route)
+    }
+
+    pub(crate) fn command_auth(
+        &self,
+        headers: &HeaderMap,
+        ip: IpAddr,
+    ) -> Result<AuthRoute, ApiError> {
+        let route = self.bridge_auth(headers, ip)?;
+
+        if !route.allows_command_route() {
+            return Err(ApiError::forbidden(
+                "Bearer token is not allowed to access command routes",
+            ));
+        }
+
+        Ok(route)
     }
 }

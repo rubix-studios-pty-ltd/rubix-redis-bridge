@@ -1,6 +1,7 @@
 mod env;
 mod hash;
 mod targets;
+mod token;
 
 use std::fmt;
 use std::time::Duration;
@@ -12,6 +13,7 @@ use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
 pub(crate) use hash::TokenHash;
+pub(crate) use token::TokenCaps;
 
 #[cfg(test)]
 pub(crate) use {env::parse_csv, targets::parse_file_targets};
@@ -58,6 +60,7 @@ pub struct AuthToken {
     pub name: Option<String>,
     pub hash: TokenHash,
     pub enabled: bool,
+    pub token_type: TokenCaps,
 }
 
 impl fmt::Debug for Bridge {
@@ -105,6 +108,7 @@ impl fmt::Debug for AuthToken {
             .field("name", &self.name)
             .field("hash", &self.hash)
             .field("enabled", &self.enabled)
+            .field("token_type", &self.token_type)
             .finish()
     }
 }
@@ -121,7 +125,6 @@ impl Bridge {
         let request_timeout_ms: u64 = parse_env_or_default("RRB_REQUEST_TIMEOUT_MS", 5_000)?;
         let acquire_timeout_ms: u64 = parse_env_or_default("RRB_ACQUIRE_TIMEOUT_MS", 100)?;
         let max_response_bytes = parse_env_or_default("RRB_MAX_RESPONSE_BYTES", 10 * 1024 * 1024)?;
-        let upstash_ratelimit = parse_bool_env("RRB_UPSTASH_RATELIMIT", false)?;
         let auth_lockout_failures = parse_env_or_default("RRB_AUTH_LOCKOUT_FAILURES", 10)?;
         let auth_lockout_window_seconds: u64 =
             parse_env_or_default("RRB_AUTH_LOCKOUT_WINDOW_SECONDS", 300)?;
@@ -148,20 +151,16 @@ impl Bridge {
             TrustedProxies::default()
         };
 
-        let mut allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
+        let allowed_commands = parse_csv_env_first(&["RRB_ALLOWED_COMMANDS"])?
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
 
         let mut blocked_commands = parse_command_list(DENIED_COMMANDS);
+        for &command in RATELIMIT_COMMANDS {
+            blocked_commands.remove(command);
+        }
 
         if let Some(extra_blocked_commands) = parse_csv_env_first(&["RRB_BLOCKED_COMMANDS"])? {
             blocked_commands.extend(extra_blocked_commands);
-        }
-
-        if upstash_ratelimit {
-            for &command in RATELIMIT_COMMANDS {
-                allowed_commands.insert(command.to_string());
-                blocked_commands.remove(command);
-            }
         }
 
         if auth_lockout_failures > 0 && auth_lockout_window_seconds == 0 {
@@ -188,7 +187,6 @@ impl Bridge {
             max_pipeline_commands,
             max_command_args,
             max_arg_bytes,
-            upstash_ratelimit,
         };
 
         security.validate()?;

@@ -249,31 +249,30 @@ Some Redis commands are unsafe in a shared HTTP bridge because they alter server
 
 The bridge hard-denies high-risk commands before Redis execution. Denied groups include scripting, functions, administrative operations, connection-state commands, transaction-state commands, destructive commands, blocking commands, pub/sub, replication, persistence, observability, and expensive keyspace commands.
 
-Examples include `CONFIG`, `FLUSHALL`, `FLUSHDB`, `MONITOR`, `KEYS`, `MODULE`, `ACL`, `CLIENT`, `SELECT`, `AUTH`, `HELLO`, `MULTI`, `EXEC`, `WATCH`, `DISCARD`, `SUBSCRIBE`, `XREAD`, `EVAL`, `EVALSHA`, and `SCRIPT`.
+Examples include `CONFIG`, `FLUSHALL`, `FLUSHDB`, `MONITOR`, `KEYS`, `MODULE`, `ACL`, `CLIENT`, `SELECT`, `AUTH`, `HELLO`, `MULTI`, `EXEC`, `WATCH`, `DISCARD`, `SUBSCRIBE`, `XREAD`, `EVAL`, `EVALSHA`, and `SCRIPT`. The `ratelimit` token type creates a narrow exception for `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands only.
 
 | Risk | Control |
 | --- | --- |
-| Allowlist accidentally includes hard-denied command | Startup validation rejects hard-denied commands in the allowlist |
+| Allowlist accidentally includes hard-denied command | Startup validation rejects commands that remain hard-denied even under the `ratelimit` profile |
 | Runtime attempt to execute hard-denied command | Policy rejects command before Redis execution |
 | Connection-state mutation | Connection-state commands are denied |
 | Raw transaction state leakage | Raw transaction commands are denied and `/multi-exec` provides managed transaction behaviour |
 
-### 5. Upstash Ratelimit Lua compatibility
+### 5. Token type boundaries
 
-`@upstash/ratelimit` uses Redis Lua scripting for atomic rate-limit operations. To support this package, the bridge can enable a controlled compatibility mode with `RRB_UPSTASH_RATELIMIT=true`.
+Bearer tokens can be scoped by bridge capability using token types. Supported values are `command`, `ratelimit`, and `realtime`.
 
-When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy only if they are also present in `RRB_ALLOWED_COMMANDS`. `SCRIPT` remains restricted to supported cache-management subcommands, and dangerous subcommands such as `SCRIPT KILL` and `SCRIPT DEBUG` remain blocked.
-
-This mode changes the normal scripting deny policy and should be treated as privileged.
+`command` allows standard Redis commands on the Redis HTTP command routes. `ratelimit` allows only the restricted Upstash rate-limit command profile on those command routes: `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands. `realtime` is accepted by configuration for the future realtime surface, but it does not enable Pub/Sub through the command routes.
 
 | Risk | Control |
 | --- | --- |
-| Arbitrary Lua from a compromised authenticated client | Enable only for trusted private applications that require `@upstash/ratelimit` |
-| Wider blast radius from token theft | Use private networking, IP restrictions, and separate tokens for ratelimit workloads |
-| Script cache manipulation | Restrict `SCRIPT` subcommands and keep Redis isolated |
-| Accidental default enablement | Keep `RRB_UPSTASH_RATELIMIT=false` unless explicitly required |
+| Token receives more capabilities than needed | Use the smallest `RRB_TOKEN_TYPE` value required by the client |
+| Realtime-only token attempts command access | Command route authorisation rejects the token before Redis execution |
+| Future route expansion accidentally shares command policy | Keep token type checks at the route boundary |
+| Ratelimit token becomes a general Lua bypass | Restrict the ratelimit profile to `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands |
+| Operator assumes `realtime` enables Redis Pub/Sub through command routes | Document that token type controls route access only |
 
-Recommended position: use a dedicated bridge instance or dedicated token for applications that need Upstash Ratelimit compatibility. Do not enable Lua compatibility for general application traffic unless the deployment is private and the clients are trusted.
+Recommended position: use `RRB_TOKEN_TYPE=command` for normal Redis HTTP command clients. Use `RRB_TOKEN_TYPE=command,ratelimit` for clients that also use `@upstash/ratelimit`. Use `RRB_TOKEN_TYPE=command,ratelimit,realtime` only when the same token must support standard commands, the ratelimit SDK, and a future realtime route.
 
 ### 6. Pipeline abuse
 
@@ -402,7 +401,7 @@ Misconfiguration is one of the most likely deployment risks.
 | Weak `RRB_TOKEN` | Token guessing or reuse risk | Use long random tokens |
 | Public `0.0.0.0` binding without edge controls | Public attack surface | Bind privately or protect with reverse proxy policy |
 | Broad `RRB_ALLOWED_COMMANDS` | Larger blast radius | Use application-specific allowlists |
-| `RRB_UPSTASH_RATELIMIT=true` without need | Lua compatibility risk | Enable only for trusted ratelimit use cases |
+| Over-scoped `RRB_TOKEN_TYPE` | Wider route access than required | Use the smallest token capability set needed |
 | Missing `RRB_METRICS_TOKEN` | Metrics unavailable | Configure a separate metrics token for monitoring |
 | Large pipeline limit | Request amplification | Lower `RRB_MAX_PIPELINE_COMMANDS` for exposed deployments |
 | High concurrency | Backend overload | Set `RRB_MAX_CONCURRENCY` and `RRB_OPERATION_LIMIT` according to Redis capacity |
@@ -445,13 +444,13 @@ Expected result: the request is rejected if it exceeds `RRB_MAX_PIPELINE_COMMAND
 
 Required controls: set pipeline limits based on deployment needs and keep edge request rate limits in place.
 
-### Abuse case 5. Client sends unsupported `SCRIPT` subcommands
+### Abuse case 5. Realtime-only token accesses command route
 
-A client sends `SCRIPT KILL`, `SCRIPT DEBUG`, or an unknown `SCRIPT` subcommand while Upstash Ratelimit compatibility is enabled.
+A client presents a valid token configured with only the `realtime` token type and sends a request to `POST /`.
 
-Expected result: the bridge rejects dangerous or unsupported subcommands before Redis execution.
+Expected result: authentication succeeds, but route authorisation rejects the request with forbidden access before Redis execution.
 
-Required controls: keep `SCRIPT` subcommand validation strict and test denied subcommands.
+Required controls: keep token type checks at route boundaries and test command-route rejection for non-command tokens.
 
 ### Abuse case 6. Public scraper accesses `/metrics`
 
@@ -488,8 +487,9 @@ RRB_MAX_CONCURRENCY=128
 RRB_OPERATION_LIMIT=20
 RRB_CONNECTION_SHARDS=4
 
+RRB_TOKEN_TYPE=command
+
 RRB_ALLOWED_COMMANDS=PING,GET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL
-RRB_UPSTASH_RATELIMIT=false
 
 RRB_MAX_BODY_BYTES=262144
 RRB_MAX_PIPELINE_COMMANDS=100
@@ -501,9 +501,9 @@ RRB_ACQUIRE_TIMEOUT_MS=100
 RRB_REQUEST_TIMEOUT_MS=3000
 ```
 
-### Upstash Ratelimit compatibility profile
+### Command, ratelimit, and realtime token profile
 
-Use this profile only for trusted private applications that require `@upstash/ratelimit`.
+Use this profile when a trusted private application should be prepared for the existing command route, `@upstash/ratelimit`, and a future realtime route.
 
 ```bash
 RRB_MODE=env
@@ -511,13 +511,13 @@ RRB_MODE=env
 RRB_CONNECTION_STRING=redis://default:<redis-password>@redis:6379
 
 RRB_TOKEN=<long-random-token>
+RRB_TOKEN_TYPE=command,ratelimit,realtime
 RRB_METRICS_TOKEN=<long-random-metrics-token>
 
 RRB_MAX_CONCURRENCY=1024
 RRB_OPERATION_LIMIT=100
 
-RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY,EVALSHA,EVAL,SCRIPT
-RRB_UPSTASH_RATELIMIT=true
+RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
 
 RRB_MAX_BODY_BYTES=1048576
 RRB_MAX_PIPELINE_COMMANDS=1000
@@ -529,7 +529,7 @@ RRB_ACQUIRE_TIMEOUT_MS=100
 RRB_REQUEST_TIMEOUT_MS=5000
 ```
 
-Do not use the ratelimit profile as a general-purpose public Redis HTTP API configuration.
+Do not treat `realtime` as a Redis command-policy bypass. It is a route capability only. Do not treat `ratelimit` as general Lua access. It is limited to the Upstash rate-limit command profile.
 
 ### Multi-target file mode profile
 
@@ -571,7 +571,7 @@ Use this checklist before deploying the bridge.
 | Metrics token is separate from API tokens | Yes |
 | `Authorization` headers are not logged by proxies | Yes |
 | `RRB_ALLOWED_COMMANDS` is limited to application needs | Yes |
-| `RRB_UPSTASH_RATELIMIT` is enabled only when required | Yes |
+| `RRB_TOKEN_TYPE` is limited to required route capabilities | Yes |
 | Body, pipeline, argument, concurrency, and timeout limits are reviewed | Yes |
 | Redis credentials are not committed to source control | Yes |
 | File-mode config uses private file permissions | Yes, when file mode is used |
@@ -589,8 +589,8 @@ Security-sensitive changes should include or preserve tests for the following be
 | Metrics authentication | `/metrics` rejects missing or invalid metrics token |
 | Allowlist policy | Commands not in `RRB_ALLOWED_COMMANDS` are rejected |
 | Hard-denied commands | Dangerous commands are rejected even if configured |
-| Upstash Ratelimit mode | `EVAL`, `EVALSHA`, and restricted `SCRIPT` work only when compatibility mode and allowlist permit them |
-| Script subcommands | Dangerous or unsupported `SCRIPT` subcommands are rejected |
+| Token type route checks | Tokens without `command` are rejected from command routes |
+| Hard-denied scripting | `EVAL`, `EVALSHA`, and `SCRIPT` are rejected for normal `command` tokens even if configured in the allowlist |
 | Pipeline limits | Excessive pipeline command counts are rejected |
 | Argument limits | Excessive argument count and byte size are rejected |
 | Transaction handling | Raw Redis transaction commands are blocked and `/multi-exec` uses managed atomic execution |
@@ -606,7 +606,7 @@ The following risks remain even when the bridge is configured correctly.
 | Authenticated clients can misuse allowed commands | The bridge enforces command policy, not application intent |
 | Stolen tokens are sufficient for access | Bearer tokens are possession-based credentials |
 | Large Redis responses can still consume memory or bandwidth | Request limits do not bound backend response size |
-| Lua compatibility increases trust requirements | `RRB_UPSTASH_RATELIMIT=true` intentionally allows selected scripting paths |
+| Token capability scope must stay narrow | Extra token types widen route access as new bridge surfaces are added |
 | Redis data sensitivity depends on application design | The bridge does not classify or encrypt Redis values |
 | Private network exposure still matters | Internal services can be compromised or misconfigured |
 | Supply-chain trust depends on release process integrity | Operators must verify artifacts and protect CI/CD permissions |
@@ -623,13 +623,13 @@ The following improvements may further reduce risk for higher-security deploymen
 | Optional HMAC request signing | Reduces replay and token-only misuse risks |
 | mTLS support at reverse proxy layer | Stronger client authentication for internal services |
 | Structured audit log mode | Improves investigation of denied commands and failed auth attempts |
-| Dedicated ratelimit compatibility profile | Separates Lua-enabled traffic from standard cache traffic |
+| Per-token route-specific policy | Separates command and realtime traffic as the route surface grows |
 | Config validation report at startup | Makes effective policy easier to review without exposing secrets |
 
 ## Summary
 
 Rubix Redis Bridge provides a narrow, security-focused Redis-over-HTTP layer for private infrastructure. Its main protections are bearer authentication, explicit command policy, hard-denied Redis command groups, request and argument limits, per-target operation limits, Redis timeouts, metrics authentication, non-root Docker execution, and release supply-chain controls.
 
-The bridge should be deployed as a private infrastructure component. Its security depends on strong tokens, private network placement, narrow command allowlists, protected Redis backends, and careful handling of Upstash Ratelimit compatibility mode.
+The bridge should be deployed as a private infrastructure component. Its security depends on strong tokens, private network placement, narrow command allowlists, protected Redis backends, and careful token type scoping.
 
 The most important operational rule is simple. Do not expose the bridge as a general public Redis API. Treat it as a controlled service boundary between trusted applications and private Redis backends.

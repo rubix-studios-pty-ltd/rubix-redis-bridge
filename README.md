@@ -47,6 +47,7 @@ Env mode configures one Redis target from environment variables and is suitable 
 docker run --rm -p 7777:8080 \
   -e RRB_MODE=env \
   -e RRB_TOKEN='replace-with-strong-http-token' \
+  -e RRB_TOKEN_TYPE='command' \
   -e RRB_CONNECTION_STRING='redis://default:replace-with-redis-password@redis:6379' \
   -e RRB_OPERATION_LIMIT='100' \
   -e RRB_CONNECTION_SHARDS='4' \
@@ -148,26 +149,19 @@ Rubix Redis Bridge connects to the backend through the Redis protocol. Compatibi
 | Kvrocks | Supported | Compatible backend |
 | Garnet | Partial | Lua/script tests failed |
 
-## Upstash Ratelimit
+## Token types
 
-`RRB_UPSTASH_RATELIMIT=true` is a trust escalation. It allows the bridge policy to admit `EVAL`, `EVALSHA`, and restricted `SCRIPT` commands when they are also included in `RRB_ALLOWED_COMMANDS`. Those commands execute server-side Lua and should be treated as dangerous outside a controlled deployment.
-
-`@upstash/ratelimit` uses Redis Lua scripting for atomic rate-limit operations, which requires a narrower and more controlled command policy than standard Redis commands.
-
-The package typically attempts `EVALSHA` first, then falls back to `EVAL` when Redis returns `NOSCRIPT`.
-
-Enable Upstash Ratelimit:
+`RRB_TOKEN_TYPE` defines which bridge capabilities a bearer token may access. Supported values are `command`, `ratelimit`, and `realtime`. Use a comma-separated list when a token needs more than one capability.
 
 ```bash
-RRB_UPSTASH_RATELIMIT=true
-RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY,EVALSHA,EVAL,SCRIPT
+RRB_TOKEN_TYPE=command,ratelimit,realtime
 ```
 
-When enabled, `EVAL`, `EVALSHA`, and restricted `SCRIPT` calls can pass policy when also present in `RRB_ALLOWED_COMMANDS`.
+`command` allows standard Redis commands on the HTTP command routes: `POST /`, `POST /pipeline`, and `POST /multi-exec`.
 
-`SCRIPT` remains restricted to supported script cache commands. Dangerous subcommands remain blocked.
+`ratelimit` allows the restricted Upstash rate-limit command profile on the same command routes. This currently permits `EVAL`, `EVALSHA`, and safe `SCRIPT` subcommands required by `@upstash/ratelimit`, while keeping `EVAL_RO`, `EVALSHA_RO`, `FCALL`, `FUNCTION`, and other high-risk commands denied. A token with only `ratelimit` can access command routes, but only for the ratelimit profile.
 
-Only enable this for trusted applications and private deployments. Do not enable it for shared, browser-facing, third-party, weak authenticated callers.
+In file mode, set `token_type` per token. If omitted, the token defaults to `command`.
 
 ## Command policy
 
@@ -187,19 +181,19 @@ becomes:
 GET,SET,DEL
 ```
 
-`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands.
+`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands. The only scoped exception is the `ratelimit` token type, which allows the restricted `EVAL`, `EVALSHA`, and `SCRIPT` profile unless those commands are explicitly added to `RRB_BLOCKED_COMMANDS`.
 
 ## Hard-denied commands
 
 Hard-denied commands are blocked by bridge policy regardless of allowlist settings, providing a fixed safety boundary for high-risk Redis operations.
 
-Default-denied scripting and function commands:
+Default-denied scripting and function commands for normal `command` tokens:
 
 ```txt
 EVAL, EVAL_RO, EVALSHA, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
-When `RRB_UPSTASH_RATELIMIT=true`, only `EVAL`, `EVALSHA`, and restricted `SCRIPT` usage can be enabled through `RRB_ALLOWED_COMMANDS`. Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
+For tokens with `ratelimit`, only `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands are removed from the hard-deny path. Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
 
 Examples:
 
@@ -225,6 +219,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `TOKEN_RESOLUTION_FILE_PATH` | `/app/rrb-config/tokens.json` | Alternate file-mode configuration path |
 | `RRB_CONNECTION_STRING` | none | Redis connection URL used in `env` mode |
 | `RRB_TOKEN` | none | HTTP bearer token in `env` mode |
+| `RRB_TOKEN_TYPE` | `command` | Comma-separated token capabilities. Supported values: `command`, `ratelimit`, `realtime` |
 | `RRB_HASH_TOKEN` | none | HMAC-SHA256 key for file-mode token hashes |
 | `RRB_METRICS_TOKEN` | none | Bearer token required to access `/metrics` |
 | `RRB_TRUST_PROXY_HEADERS` | `false` | Enables client IP resolution from trusted proxy headers |
@@ -234,7 +229,6 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_CONNECTION_SHARDS` | `4` | Redis `ConnectionManager` shards per target |
 | `RRB_ALLOWED_COMMANDS` | conservative default | Allowed Redis commands |
 | `RRB_BLOCKED_COMMANDS` | secure default | Additional Redis commands to block |
-| `RRB_UPSTASH_RATELIMIT` | `false` | Enables ratelimit compatibility |
 | `RRB_AUTH_LOCKOUT_FAILURES` | `10` | Failed authentication attempts allowed before lockout |
 | `RRB_AUTH_LOCKOUT_WINDOW_SECONDS` | `300` | Time window for counting authentication failures |
 | `RRB_AUTH_LOCKOUT_SECONDS` | `300` | Lockout duration after too many authentication failures |
@@ -312,6 +306,7 @@ Example:
           "id": "primary_app",
           "name": "Production app token",
           "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "token_type": "command,ratelimit,realtime",
           "enabled": true
         }
       ]
@@ -325,6 +320,7 @@ Example:
         {
           "id": "secondary_app",
           "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "token_type": "command",
           "enabled": true
         }
       ]

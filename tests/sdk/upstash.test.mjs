@@ -51,7 +51,7 @@ async function ratelimitDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge is running without Upstash ratelimit')
+    t.skip('Bridge is running without token_type=ratelimit')
     return true
   }
 
@@ -66,7 +66,7 @@ async function scriptFlushDisabled(t) {
   }
 
   if (policy(command)) {
-    t.skip('Bridge is running without SCRIPT FLUSH')
+    t.skip('Bridge is running without SCRIPT FLUSH token_type=ratelimit')
     return true
   }
 
@@ -271,7 +271,7 @@ test('Test(@upstash/redis): unauthorized requests rejected', async () => {
   assert.equal(response.status, 401)
 })
 
-test('Test(@upstash/redis): dangerous commands rejected before execution', async () => {
+test('Test(@upstash/redis): dangerous commands rejected', async () => {
   const result = await rawCommand(['FCALL', 'some_function', 0])
 
   assert.equal(result.status, 400)
@@ -279,14 +279,14 @@ test('Test(@upstash/redis): dangerous commands rejected before execution', async
   assert.match(result.error, /hard-denied|not allowed/i)
 })
 
-test('Test(@upstash/redis): connection-state commands are rejected before execution', async () => {
+test('Test(@upstash/redis): connection-state commands rejected', async () => {
   const result = await rawCommand(['SELECT', '1'])
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
 })
 
-test('Test(@upstash/ratelimit): upstash ratelimit fixed window', async (t) => {
+test('Test(@upstash/ratelimit): fixed window with token_type=ratelimit', async (t) => {
   if (await ratelimitDisabled(t)) {
     return
   }
@@ -317,7 +317,7 @@ test('Test(@upstash/ratelimit): upstash ratelimit fixed window', async (t) => {
   assert.equal(third.remaining, 0)
 })
 
-test('Test(@upstash/ratelimit): upstash ratelimit fallback', async (t) => {
+test('Test(@upstash/ratelimit): fallback with token_type=ratelimit', async (t) => {
   if (await scriptFlushDisabled(t)) {
     return
   }
