@@ -7,7 +7,4 @@ pub(crate) use execute::{execute_command, execute_pipeline, execute_transaction}
 pub(crate) use response::{CommandResponse, PipelineResponse, TransactionResponse};
 
 #[cfg(test)]
-pub(crate) use {
-    response::RedisResponse,
-    value::RedisJson,
-};
+pub(crate) use {response::RedisResponse, value::RedisJson};
