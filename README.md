@@ -161,8 +161,6 @@ RRB_TOKEN_TYPE=command,ratelimit,realtime
 
 `ratelimit` allows the restricted Upstash rate-limit command profile on the same command routes. This currently permits `EVAL`, `EVALSHA`, and safe `SCRIPT` subcommands required by `@upstash/ratelimit`, while keeping `EVAL_RO`, `EVALSHA_RO`, `FCALL`, `FUNCTION`, and other high-risk commands denied. A token with only `ratelimit` can access command routes, but only for the ratelimit profile.
 
-`realtime` is accepted by configuration now so tokens can be prepared for the realtime route. It does not enable Pub/Sub through the existing command routes.
-
 In file mode, set `token_type` per token. If omitted, the token defaults to `command`.
 
 ## Command policy
