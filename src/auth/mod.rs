@@ -1,4 +1,7 @@
-mod auth;
 mod lockout;
+mod main;
 
-pub(crate) use lockout::{AuthFailure, AuthLockout};
+pub(crate) use lockout::AuthLockout;
+
+#[cfg(test)]
+pub(crate) use lockout::AuthFailure;

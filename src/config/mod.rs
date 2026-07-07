@@ -11,9 +11,13 @@ use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
-pub(crate) use env::parse_csv;
 pub(crate) use hash::TokenHash;
-pub(crate) use targets::parse_file_targets;
+
+#[cfg(test)]
+pub(crate) use {
+    env::parse_csv,
+    targets::parse_file_targets,
+};
 
 use self::env::{
     env_first, env_or, parse_bool_env, parse_command_list, parse_csv_env_first,
