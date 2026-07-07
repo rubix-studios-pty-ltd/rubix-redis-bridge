@@ -1,5 +1,8 @@
+mod auth;
+mod env;
 mod hash;
 mod headers;
+mod lockout;
 mod parse;
 mod security;
 mod targets;

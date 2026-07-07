@@ -87,11 +87,11 @@ impl AuthLockout {
         if !self.is_enabled() {
             return false;
         }
-    
+
         let mut entries = self.entries.lock().expect("auth lockout mutex poisoned");
-    
+
         Self::cleanup_stale_entries(&mut entries, now, self.failure_window);
-    
+
         entries
             .get(&ip)
             .and_then(|state| state.locked_until)
@@ -123,9 +123,7 @@ impl AuthLockout {
             }
         }
 
-        let state = entries
-            .entry(ip)
-            .or_insert_with(|| AuthState::new(now));
+        let state = entries.entry(ip).or_insert_with(|| AuthState::new(now));
 
         if let Some(until) = state.locked_until {
             if until > now {
@@ -211,7 +209,7 @@ impl AuthLockout {
             .expect("auth lockout mutex poisoned")
             .contains_key(&ip)
     }
-    
+
     #[cfg(test)]
     pub(crate) fn is_empty(&self) -> bool {
         self.entries

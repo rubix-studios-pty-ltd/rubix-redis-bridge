@@ -1,6 +1,6 @@
 mod env;
-mod targets;
 mod hash;
+mod targets;
 
 use std::fmt;
 use std::time::Duration;
@@ -11,6 +11,7 @@ use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
+pub(crate) use env::parse_csv;
 pub(crate) use hash::TokenHash;
 pub(crate) use targets::parse_file_targets;
 
