@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use super::env::{env_first, env_or, parse_env_first};
 use super::{
-    AuthToken, Redis, TokenHash, TokenTypes, default_connection_shards, default_operation_limit,
+    AuthToken, Redis, TokenCaps, TokenHash, default_connection_shards, default_operation_limit,
 };
 
 pub(super) fn load_targets() -> anyhow::Result<Vec<Redis>> {
@@ -39,7 +39,7 @@ fn load_env_target() -> anyhow::Result<Vec<Redis>> {
         parse_env_first(&["RRB_CONNECTION_SHARDS"], default_connection_shards())?;
 
     let token_type = env_first(&["RRB_TOKEN_TYPE"])
-        .map(|value| TokenTypes::parse(&value, "RRB_TOKEN_TYPE"))
+        .map(|value| TokenCaps::parse(&value, "RRB_TOKEN_TYPE"))
         .transpose()?
         .unwrap_or_default();
 
@@ -188,7 +188,7 @@ pub(crate) fn parse_file_targets(
                 .token_type
                 .as_deref()
                 .map(|value| {
-                    TokenTypes::parse(
+                    TokenCaps::parse(
                         value,
                         &format!("token_type for token {id} on target {rrb_id}"),
                     )

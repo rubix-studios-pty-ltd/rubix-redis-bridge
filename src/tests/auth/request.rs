@@ -7,7 +7,7 @@ use axum::response::IntoResponse;
 
 use crate::app::{ApiError, AppState};
 use crate::client::TrustedProxies;
-use crate::config::{AuthToken, Bridge, Redis, TokenHash, TokenTypes};
+use crate::config::{AuthToken, Bridge, Redis, TokenCaps, TokenHash};
 use crate::security::SecurityPolicy;
 
 fn ip(value: &str) -> IpAddr {
@@ -38,7 +38,7 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
             name: Some("Test token".to_string()),
             hash: TokenHash::sha256("valid-token"),
             enabled: true,
-            token_type: TokenTypes::default(),
+            token_type: TokenCaps::default(),
         }],
     }];
 
@@ -84,7 +84,7 @@ fn test_hmac() -> AppState {
             name: Some("Test token".to_string()),
             hash: TokenHash::hmac_sha256("hash-key", "valid-token"),
             enabled: true,
-            token_type: TokenTypes::default(),
+            token_type: TokenCaps::default(),
         }],
     }];
 
@@ -280,7 +280,7 @@ fn realtime_only_token_rejects_command_route() {
             name: Some("Test token".to_string()),
             hash: TokenHash::sha256("valid-token"),
             enabled: true,
-            token_type: TokenTypes::parse("realtime", "test").unwrap(),
+            token_type: TokenCaps::parse("realtime", "test").unwrap(),
         }],
     }];
 

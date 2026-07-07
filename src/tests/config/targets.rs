@@ -1,4 +1,4 @@
-use crate::config::{TokenTypes, parse_file_targets};
+use crate::config::{TokenCaps, parse_file_targets};
 
 #[test]
 fn parses_file_targets() {
@@ -30,7 +30,7 @@ fn parses_file_targets() {
     assert_eq!(targets[0].connection_shards, 8);
     assert_eq!(targets[0].tokens.len(), 1);
     assert!(targets[0].tokens[0].enabled);
-    assert_eq!(targets[0].tokens[0].token_type, TokenTypes::default());
+    assert_eq!(targets[0].tokens[0].token_type, TokenCaps::default());
 }
 
 #[test]

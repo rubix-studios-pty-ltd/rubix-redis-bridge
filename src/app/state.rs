@@ -12,7 +12,7 @@ use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
-use crate::config::{Bridge, Redis, TokenHash, TokenTypes};
+use crate::config::{Bridge, Redis, TokenCaps, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
@@ -41,7 +41,7 @@ pub(crate) struct RedisTarget {
 #[derive(Clone)]
 pub(crate) struct AuthRoute {
     target: Arc<RedisTarget>,
-    token_type: TokenTypes,
+    token_type: TokenCaps,
 }
 
 impl fmt::Debug for AppState {
@@ -215,7 +215,7 @@ impl AuthRoute {
         self.token_type.allows_command_route()
     }
 
-    pub(crate) fn token_type(&self) -> &TokenTypes {
+    pub(crate) fn token_type(&self) -> &TokenCaps {
         &self.token_type
     }
 

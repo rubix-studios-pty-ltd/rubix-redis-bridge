@@ -3,7 +3,7 @@ use std::fmt;
 
 use anyhow::{anyhow, bail};
 
-use crate::config::TokenTypes;
+use crate::config::TokenCaps;
 
 use super::deny::{is_denied_command, ratelimit_commands, reject_command};
 use super::script::validate_subcommand;
@@ -57,7 +57,7 @@ impl SecurityPolicy {
     pub fn parse_command(
         &self,
         array: &[CommandArg],
-        token_type: &TokenTypes,
+        token_type: &TokenCaps,
     ) -> anyhow::Result<RedisCommand> {
         self.parse_command_array(array, token_type)
     }
@@ -65,7 +65,7 @@ impl SecurityPolicy {
     pub fn parse_command_list(
         &self,
         commands: &[Vec<CommandArg>],
-        token_type: &TokenTypes,
+        token_type: &TokenCaps,
     ) -> anyhow::Result<Vec<RedisCommand>> {
         if commands.len() > self.max_pipeline_commands {
             bail!(
@@ -83,7 +83,7 @@ impl SecurityPolicy {
     fn parse_command_array(
         &self,
         array: &[CommandArg],
-        token_type: &TokenTypes,
+        token_type: &TokenCaps,
     ) -> anyhow::Result<RedisCommand> {
         if array.is_empty() {
             bail!("Invalid command array. Command cannot be empty.");
@@ -122,6 +122,7 @@ impl SecurityPolicy {
 
         let standard_allowed =
             token_type.allows_command() && self.allowed_commands.contains(&command_name);
+
         let ratelimit_allowed =
             allow_ratelimit && ratelimit_commands().contains(command_name.as_str());
 

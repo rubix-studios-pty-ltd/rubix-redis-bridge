@@ -13,7 +13,7 @@ use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
 use crate::security::SecurityPolicy;
 
 pub(crate) use hash::TokenHash;
-pub(crate) use token::TokenTypes;
+pub(crate) use token::TokenCaps;
 
 #[cfg(test)]
 pub(crate) use {env::parse_csv, targets::parse_file_targets};
@@ -60,7 +60,7 @@ pub struct AuthToken {
     pub name: Option<String>,
     pub hash: TokenHash,
     pub enabled: bool,
-    pub token_type: TokenTypes,
+    pub token_type: TokenCaps,
 }
 
 impl fmt::Debug for Bridge {

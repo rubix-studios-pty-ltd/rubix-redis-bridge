@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde_json::{Value, json};
 
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
-use crate::config::TokenTypes;
+use crate::config::TokenCaps;
 use crate::security::{CommandArg, SecurityPolicy};
 use crate::security::{denied_commands, is_denied_command, ratelimit_commands};
 
@@ -27,16 +27,16 @@ fn ratelimit_policy() -> SecurityPolicy {
     policy
 }
 
-fn command_token() -> TokenTypes {
-    TokenTypes::parse("command", "test").unwrap()
+fn command_token() -> TokenCaps {
+    TokenCaps::parse("command", "test").unwrap()
 }
 
-fn ratelimit_token() -> TokenTypes {
-    TokenTypes::parse("ratelimit", "test").unwrap()
+fn ratelimit_token() -> TokenCaps {
+    TokenCaps::parse("ratelimit", "test").unwrap()
 }
 
-fn command_ratelimit_token() -> TokenTypes {
-    TokenTypes::parse("command,ratelimit", "test").unwrap()
+fn command_ratelimit_token() -> TokenCaps {
+    TokenCaps::parse("command,ratelimit", "test").unwrap()
 }
 
 fn command(value: Value) -> Vec<CommandArg> {
@@ -51,7 +51,7 @@ fn error_contains_for(
     policy: &SecurityPolicy,
     value: Value,
     expected: &str,
-    token_type: &TokenTypes,
+    token_type: &TokenCaps,
 ) {
     let command = command(value);
     let err = policy.parse_command(&command, token_type).unwrap_err();

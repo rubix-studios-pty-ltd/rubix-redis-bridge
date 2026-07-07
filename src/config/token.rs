@@ -3,13 +3,13 @@ use std::fmt;
 use anyhow::bail;
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct TokenTypes {
+pub struct TokenCaps {
     command: bool,
     ratelimit: bool,
     realtime: bool,
 }
 
-impl TokenTypes {
+impl TokenCaps {
     pub(crate) fn command() -> Self {
         Self {
             command: true,
@@ -86,13 +86,13 @@ impl TokenTypes {
     }
 }
 
-impl Default for TokenTypes {
+impl Default for TokenCaps {
     fn default() -> Self {
         Self::command()
     }
 }
 
-impl fmt::Debug for TokenTypes {
+impl fmt::Debug for TokenCaps {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.config_value())
     }
