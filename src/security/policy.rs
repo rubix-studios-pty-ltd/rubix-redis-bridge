@@ -40,7 +40,7 @@ impl SecurityPolicy {
         let hard_denied_allowed = self
             .allowed_commands
             .iter()
-            .filter(|command| is_denied_command(command, true))
+            .filter(|command| is_denied_command(command, false))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -114,10 +114,6 @@ impl SecurityPolicy {
             validate_subcommand(array)?;
         } else {
             reject_command(&command_name, allow_ratelimit)?;
-        }
-
-        if self.allowed_commands.is_empty() {
-            bail!("No Redis commands are allowed by policy.");
         }
 
         let standard_allowed =

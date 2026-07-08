@@ -109,11 +109,6 @@ fn reject_denied_commands_in_allowlist() {
 }
 
 #[test]
-fn allow_ratelimit_commands_in_allowlist() {
-    assert!(ratelimit_policy().validate().is_ok());
-}
-
-#[test]
 fn reject_empty_allowlist() {
     let mut policy = policy();
 
@@ -156,7 +151,20 @@ fn accept_ratelimit_profile() {
 }
 
 #[test]
-fn reject_ratelimit_commands_without_ratelimit_token_type() {
+fn reject_ratelimit_commands_allowlist() {
+    let mut policy = policy();
+
+    for command in ["EVAL", "EVALSHA", "SCRIPT"] {
+        policy.allowed_commands.insert(command.to_string());
+    }
+
+    let err = policy.validate().unwrap_err();
+
+    assert!(err.to_string().contains("hard-denied"));
+}
+
+#[test]
+fn reject_ratelimit_commands_without_ratelimit() {
     let policy = ratelimit_policy();
 
     for command in ["EVAL", "EVALSHA", "SCRIPT"] {
@@ -165,7 +173,7 @@ fn reject_ratelimit_commands_without_ratelimit_token_type() {
 }
 
 #[test]
-fn ratelimit_only_token_rejects_standard_commands() {
+fn rejects_standard_commands_ratelimit() {
     error_contains_for(
         &policy(),
         json!(["GET", "key"]),
@@ -240,7 +248,7 @@ fn reject_ratelimit_script_kill() {
 }
 
 #[test]
-fn reject_explicitly_blocked_ratelimit_command() {
+fn reject_user_blocked_ratelimit_command() {
     let mut policy = ratelimit_policy();
     policy.blocked_commands.insert("EVAL".to_string());
 
