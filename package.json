@@ -59,7 +59,7 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.2",
+    "@biomejs/biome": "2.5.3",
     "@upstash/ratelimit": "latest",
     "@upstash/redis": "latest"
   }
