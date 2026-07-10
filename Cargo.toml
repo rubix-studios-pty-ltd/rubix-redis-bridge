@@ -27,7 +27,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
-num-bigint = "0.4"
+num-bigint = "0.5"
 
 [profile.release]
 codegen-units = 1
