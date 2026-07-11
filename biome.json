@@ -1,9 +1,9 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!target"]
+    "includes": ["**", "!node_modules", "!target", "!**/*.svg", "!**/*.png", "!**/*.ico"]
   },
   "formatter": {
     "enabled": true,
@@ -83,10 +83,7 @@
       "trailingCommas": "es5",
       "semicolons": "asNeeded",
       "arrowParentheses": "always",
-      "bracketSameLine": false,
-      "quoteStyle": "single",
-      "attributePosition": "auto",
-      "bracketSpacing": true
+      "quoteStyle": "single"
     }
   },
   "assist": {
@@ -97,14 +94,25 @@
           "level": "on",
           "options": {
             "groups": [
-              [":NODE:", ":BUN:", ":PACKAGE:", "react", "react/**", "react-*", "react-*/**"],
+              ":NODE:",
+              ":BUN:",
+              ["node", "node:*"],
+              ["react", "react/**"],
+              ":PACKAGE:",
               ":BLANK_LINE:",
-              ["**", "!**/*.css", "!**/*.scss"],
+              ["**", "!:STYLE:"],
               ":BLANK_LINE:",
-              ["**/*.css", "**/*.scss"]
+              [":STYLE:"]
             ]
           }
-        }
+        },
+        "useSortedAttributes": {
+          "level": "on",
+          "options": {
+            "sortOrder": "natural"
+          }
+        },
+        "useSortedInterfaceMembers": "on"
       }
     }
   }
