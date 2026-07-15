@@ -161,7 +161,7 @@ jobs:
           docker run -d \
             --name rrb-bridge \
             --network rrb-test \
-            -p 127.0.0.1:7777:8080 \
+            -p 127.0.0.1:8080:8080 \
             -e RRB_MODE=env \
             -e RRB_HOST=0.0.0.0 \
             -e RRB_PORT=8080 \
@@ -171,7 +171,7 @@ jobs:
             rubix-redis-bridge:test
 
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:7777/healthz; then
+            if curl -fsS http://127.0.0.1:8080/healthz; then
               echo "Docker image is alive"
               break
             fi
@@ -179,7 +179,7 @@ jobs:
             sleep 1
           done
 
-          curl -fsS http://127.0.0.1:7777/ \
+          curl -fsS http://127.0.0.1:8080/ \
             -H "Authorization: Bearer test-bridge-token" \
             -H "Content-Type: application/json" \
             -d '["PING"]'

@@ -47,7 +47,7 @@ Security controls are applied before requests reach Redis, reducing the risk of 
 Env mode configures one Redis target from environment variables and is suitable for local testing, Docker deployments, and simple single-target bridge deployments.
 
 ```bash
-docker run --rm -p 7777:8080 \
+docker run --rm -p 8080:8080 \
   -e RRB_MODE=env \
   -e RRB_TOKEN='replace-with-strong-http-token' \
   -e RRB_TOKEN_TYPE='command' \
@@ -62,7 +62,7 @@ docker run --rm -p 7777:8080 \
 Test the bridge:
 
 ```bash
-curl -sS http://127.0.0.1:7777/ \
+curl -sS http://127.0.0.1:8080/ \
   -H "Authorization: Bearer $RRB_TOKEN" \
   -H "Content-Type: application/json" \
   -d '["PING"]'
@@ -397,7 +397,7 @@ Backend failures are returned per command as `503`.
 `GET /metrics` exposes Prometheus metrics and requires `RRB_METRICS_TOKEN`. Do not expose this endpoint to external networks. Bind it privately, scrape it over an internal network, or protect it behind trusted infrastructure access controls.
 
 ```bash
-curl -sS http://127.0.0.1:7777/metrics \
+curl -sS http://127.0.0.1:8080/metrics \
   -H "Authorization: Bearer $RRB_METRICS_TOKEN"
 ```
 
@@ -448,14 +448,14 @@ Local-only binding:
 
 ```yaml
 ports:
-  - "127.0.0.1:7777:8080"
+  - "127.0.0.1:8080:8080"
 ```
 
 Tailscale-only binding:
 
 ```yaml
 ports:
-  - "<tailscale-ip>:7777:8080"
+  - "<tailscale-ip>:8080:8080"
 ```
 
 Do not publish the bridge directly to the public internet without network restrictions, rate limits, a reverse proxy, strict command access, and monitoring.
@@ -485,7 +485,7 @@ pnpm test:all
 PowerShell:
 
 ```powershell
-$env:RRB_TEST_URL = "http://127.0.0.1:7777"
+$env:RRB_TEST_URL = "http://127.0.0.1:8080"
 $env:RRB_TOKEN = "replace-with-bridge-token"
 pnpm test:sdk
 ```
