@@ -2,7 +2,7 @@
 
 This document describes the security assumptions, trust boundaries, threat scenarios, and recommended controls for Rubix Redis Bridge.
 
-Rubix Redis Bridge is a Redis-over-HTTP bridge for private infrastructure. It allows selected applications to execute supported Redis commands through an HTTP API while the bridge enforces bearer authentication, command policy, request limits, argument limits, Redis operation limits, and timeouts.
+Rubix Redis Bridge is a Redis-over-HTTP bridge for private infrastructure. It allows selected applications to execute supported Redis commands and use managed realtime subscriptions while the bridge enforces bearer authentication, capability policy, request limits, argument limits, Redis operation limits, realtime connection limits, and timeouts.
 
 This document is intended for operators, maintainers, security reviewers, and contributors who need to understand the security model before deploying, modifying, or extending the bridge.
 
@@ -14,12 +14,12 @@ The following components are in scope.
 
 | Component | In scope |
 | --- | --- |
-| HTTP API | `POST /`, `POST /pipeline`, `POST /multi-exec` |
+| HTTP API | `POST /`, `POST /pipeline`, `POST /multi-exec`, `POST /subscribe/<channel>` |
 | Operational endpoints | `GET /healthz`, `GET /readyz`, `GET /metrics` |
 | Authentication | Bearer token validation for API and metrics access |
-| Command policy | Allowlists, additive blocklists, hard-denied commands, Upstash Ratelimit exception handling |
+| Command policy | Allowlists, additive blocklists, hard-denied commands, and scoped Ratelimit and Realtime exceptions |
 | Request validation | JSON shape, pipeline size, argument count, argument byte limits, body size limit |
-| Redis execution | Connection manager usage, per-target operation limits, Redis command timeout handling |
+| Redis execution | Connection manager usage, dedicated Pub/Sub connections, operation limits, realtime connection limits, and timeout handling |
 | Multi-target routing | File-mode token to Redis target mapping |
 | Docker runtime | Non-root container execution and private binding expectations |
 | Supply chain | Dependency checks, image scanning, SBOM, provenance, and image signing workflow |
@@ -53,7 +53,7 @@ A secure deployment should meet these baseline conditions.
 | Metrics access | `/metrics` uses a separate strong token and is not publicly exposed |
 | Network exposure | The bridge is bound to localhost, Docker-internal networking, a VPN address, or a protected reverse proxy |
 | Command policy | `RRB_ALLOWED_COMMANDS` is kept narrow for the application use case |
-| Runtime limits | Body size, pipeline size, argument limits, concurrency, and timeouts are configured intentionally |
+| Runtime limits | Body size, pipeline size, argument limits, command concurrency, realtime concurrency, and timeouts are configured intentionally |
 | Secret handling | Tokens and Redis credentials are stored in a secret manager or protected environment variables |
 | Logging | Logs are collected without exposing bearer tokens or Redis connection strings |
 
@@ -71,6 +71,8 @@ The bridge is designed to meet the following security objectives.
 | Prevent connection-state abuse | Commands such as `SELECT`, `AUTH`, `HELLO`, `MULTI`, `EXEC`, `WATCH`, and `DISCARD` are blocked because they can alter shared connection state |
 | Limit request size | Oversized HTTP bodies, pipelines, command argument counts, and argument byte sizes must be rejected |
 | Bound backend execution | Redis connection acquisition and execution are bounded by timeout and per-target operation limits |
+| Isolate realtime capacity | Long-lived Pub/Sub connections use a dedicated connection limit and do not consume ordinary command operation permits |
+| Scope unsafe compatibility | Lua and Pub/Sub exceptions are available only to the token capability that requires them |
 | Separate metrics access | Prometheus metrics require a separate metrics token rather than a Redis API token |
 | Reduce secret exposure | Redis connection strings and tokens must not be emitted through debug output |
 | Preserve private deployment assumptions | The bridge should be safe for private infrastructure, not advertised as a public Redis gateway |
@@ -84,7 +86,7 @@ The following are non-goals.
 | Non-goal | Explanation |
 | --- | --- |
 | Public anonymous access | Every Redis API request requires bearer authentication |
-| Full Redis command compatibility | Administrative, blocking, scripting, pub/sub, transaction-state, and connection-state commands are restricted or denied |
+| Full Redis command compatibility | Administrative, blocking, general Pub/Sub, transaction-state, and connection-state commands are restricted or denied. Realtime exposes only managed exact-channel subscriptions and publishing |
 | Redis ACL replacement | Redis should still use authentication and network isolation where practical |
 | Public multi-tenant Redis hosting | The bridge is not a managed Redis service or tenant isolation platform |
 | Browser client security | Bearer tokens should not be embedded in public frontend code |
@@ -122,19 +124,19 @@ Recommended controls include TLS, IP allowlists, private network binding, VPN ac
 
 ### Boundary 2. Network edge to bridge
 
-The bridge receives HTTP requests and applies bearer authentication, body limits, concurrency limits, JSON parsing, command policy, and argument validation.
+The bridge receives HTTP requests and applies bearer authentication, body limits, concurrency limits, JSON parsing, command policy, argument validation, and realtime channel validation.
 
 Main risks at this boundary include malformed JSON, oversized requests, invalid command arrays, blocked command attempts, abuse of pipelines, and excessive concurrent work.
 
-Recommended controls include `RRB_MAX_BODY_BYTES`, `RRB_MAX_CONCURRENCY`, `RRB_MAX_PIPELINE_COMMANDS`, `RRB_MAX_COMMAND_ARGS`, `RRB_MAX_ARG_BYTES`, and strict command allowlists.
+Recommended controls include `RRB_MAX_BODY_BYTES`, `RRB_MAX_CONCURRENCY`, `RRB_REALTIME_MAX_CONCURRENCY`, `RRB_MAX_PIPELINE_COMMANDS`, `RRB_MAX_COMMAND_ARGS`, `RRB_MAX_ARG_BYTES`, and strict command allowlists.
 
 ### Boundary 3. Bridge to Redis
 
-The bridge connects to the configured Redis backend through a Redis connection manager. The Redis backend should be private and should not be directly reachable from untrusted networks.
+The bridge connects commands through Redis connection managers. Each accepted realtime subscription receives a dedicated Redis Pub/Sub connection because a subscribed RESP2 connection cannot safely execute ordinary commands. The Redis backend should be private and should not be directly reachable from untrusted networks.
 
-Main risks at this boundary include backend overload, Redis timeout, large response generation, incorrect Redis credentials, over-broad command access, and accidental cross-target access.
+Main risks at this boundary include backend overload, excessive Pub/Sub connections, Redis timeout, large response generation, incorrect Redis credentials, over-broad command access, and accidental cross-target access.
 
-Recommended controls include Redis authentication, private networking, per-target `RRB_MAX_CONCURRENCY`, `RRB_REQUEST_TIMEOUT_MS`, narrow allowlists, Redis resource limits, and operational monitoring.
+Recommended controls include Redis authentication, private networking, `RRB_OPERATION_LIMIT`, `RRB_REALTIME_MAX_CONCURRENCY`, `RRB_REQUEST_TIMEOUT_MS`, narrow allowlists, Redis resource limits, and operational monitoring.
 
 ### Boundary 4. Operator to configuration
 
@@ -154,7 +156,7 @@ The API request flow is as follows.
 4. The request body is parsed as JSON.
 5. The bridge validates the command shape.
 6. The command name is normalized to uppercase.
-7. Hard-denied commands are rejected before allowlist evaluation, except for the explicit Upstash Ratelimit compatibility path.
+7. Hard-denied commands are rejected before allowlist evaluation, except for scoped Ratelimit and Realtime command profiles.
 8. The bridge checks the command allowlist and additive blocklist.
 9. The bridge validates command argument count and argument byte size.
 10. The bridge acquires a per-target operation permit.
@@ -162,6 +164,17 @@ The API request flow is as follows.
 12. The Redis operation runs inside the configured timeout.
 13. The Redis response is encoded as JSON and returned to the client.
 14. Metrics are updated for operation count, duration, in-flight operations, errors, timeouts, and denied commands.
+
+The realtime subscription flow is separate.
+
+1. The Upstash Redis SDK sends `POST /subscribe/<channel>` with a bearer token.
+2. The bridge requires the token to include the `realtime` capability.
+3. The channel is validated for size and SSE framing compatibility.
+4. The bridge acquires a dedicated realtime permit without using ordinary HTTP command concurrency or a target operation permit.
+5. The bridge opens a dedicated Redis Pub/Sub connection and subscribes to the exact channel inside the setup timeout.
+6. The bridge returns an SSE stream using the event framing expected by `@upstash/redis`.
+7. The realtime permit and Pub/Sub connection remain owned by the stream until the client disconnects or Redis closes the connection.
+8. Keepalive comments prevent idle intermediaries from silently buffering or expiring the stream.
 
 The metrics request flow is separate.
 
@@ -249,11 +262,11 @@ Some Redis commands are unsafe in a shared HTTP bridge because they alter server
 
 The bridge hard-denies high-risk commands before Redis execution. Denied groups include scripting, functions, administrative operations, connection-state commands, transaction-state commands, destructive commands, blocking commands, pub/sub, replication, persistence, observability, and expensive keyspace commands.
 
-Examples include `CONFIG`, `FLUSHALL`, `FLUSHDB`, `MONITOR`, `KEYS`, `MODULE`, `ACL`, `CLIENT`, `SELECT`, `AUTH`, `HELLO`, `MULTI`, `EXEC`, `WATCH`, `DISCARD`, `SUBSCRIBE`, `XREAD`, `EVAL`, `EVALSHA`, and `SCRIPT`. The `ratelimit` token type creates a narrow exception for `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands only.
+Examples include `CONFIG`, `FLUSHALL`, `FLUSHDB`, `MONITOR`, `KEYS`, `MODULE`, `ACL`, `CLIENT`, `SELECT`, `AUTH`, `HELLO`, `MULTI`, `EXEC`, `WATCH`, `DISCARD`, `SUBSCRIBE`, `PUBLISH`, `XREAD`, `EVAL`, `EVALSHA`, and `SCRIPT`. The `ratelimit` token type creates a narrow exception for `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands. The `realtime` token type creates a narrow exception for `PUBLISH`; raw `SUBSCRIBE` remains blocked and is managed by the SSE route.
 
 | Risk | Control |
 | --- | --- |
-| Allowlist accidentally includes hard-denied command | Startup validation rejects commands that remain hard-denied even under the `ratelimit` profile |
+| Allowlist accidentally includes hard-denied command | Startup validation rejects hard-denied commands. Scoped capability commands are granted separately from the ordinary allowlist |
 | Runtime attempt to execute hard-denied command | Policy rejects command before Redis execution |
 | Connection-state mutation | Connection-state commands are denied |
 | Raw transaction state leakage | Raw transaction commands are denied and `/multi-exec` provides managed transaction behaviour |
@@ -262,17 +275,18 @@ Examples include `CONFIG`, `FLUSHALL`, `FLUSHDB`, `MONITOR`, `KEYS`, `MODULE`, `
 
 Bearer tokens can be scoped by bridge capability using token types. Supported values are `command`, `ratelimit`, and `realtime`.
 
-`command` allows standard Redis commands on the Redis HTTP command routes. `ratelimit` allows only the restricted Upstash rate-limit command profile on those command routes: `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands. `realtime` is accepted by configuration for the future realtime surface, but it does not enable Pub/Sub through the command routes.
+`command` allows standard Redis commands on the Redis HTTP command routes. `ratelimit` allows only the restricted Upstash rate-limit command profile on those routes: `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands. `realtime` permits the four commands required by `@upstash/realtime`: `EXPIRE`, `PUBLISH`, `XADD`, and `XRANGE`. It also permits the managed SSE subscription route.
 
 | Risk | Control |
 | --- | --- |
 | Token receives more capabilities than needed | Use the smallest `RRB_TOKEN_TYPE` value required by the client |
-| Realtime-only token attempts command access | Command route authorisation rejects the token before Redis execution |
-| Future route expansion accidentally shares command policy | Keep token type checks at the route boundary |
+| Realtime-only token attempts a general command | Command policy rejects commands outside the realtime profile |
+| Token without realtime attempts SSE subscription | Realtime route authorisation rejects the token before opening Redis Pub/Sub |
 | Ratelimit token becomes a general Lua bypass | Restrict the ratelimit profile to `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands |
-| Operator assumes `realtime` enables Redis Pub/Sub through command routes | Document that token type controls route access only |
+| Realtime token becomes a general Pub/Sub bypass | Restrict realtime commands to `EXPIRE`, `PUBLISH`, `XADD`, and `XRANGE`, and keep raw subscription commands blocked |
+| Realtime client exhausts ordinary command capacity | Use an independent realtime permit pool and dedicated Redis connections |
 
-Recommended position: use `RRB_TOKEN_TYPE=command` for normal Redis HTTP command clients. Use `RRB_TOKEN_TYPE=command,ratelimit` for clients that also use `@upstash/ratelimit`. Use `RRB_TOKEN_TYPE=command,ratelimit,realtime` only when the same token must support standard commands, the ratelimit SDK, and a future realtime route.
+Recommended position: use `RRB_TOKEN_TYPE=command` for normal Redis HTTP command clients. Use `realtime` alone for an isolated `@upstash/realtime` client. Use `command,realtime` when the same Redis client also needs general commands. Add `ratelimit` only when the same token uses `@upstash/ratelimit`.
 
 ### 6. Pipeline abuse
 
@@ -315,12 +329,13 @@ Recommended practice is to avoid allowing commands that can return unbounded col
 
 ### 9. Redis backend overload
 
-The Redis backend can be overloaded by high concurrency, slow commands, large responses, or too many clients sharing one target.
+The Redis backend can be overloaded by high concurrency, slow commands, large responses, excessive realtime connections, or too many clients sharing one target.
 
 | Risk | Control |
 | --- | --- |
-| Too many simultaneous Redis operations | Configure per-target `RRB_MAX_CONCURRENCY` |
+| Too many simultaneous Redis operations | Configure per-target `RRB_OPERATION_LIMIT` |
 | Too many simultaneous HTTP requests | Configure `RRB_MAX_CONCURRENCY` and edge rate limits |
+| Too many long-lived Pub/Sub connections | Configure `RRB_REALTIME_MAX_CONCURRENCY` and edge rate limits |
 | Slow Redis backend | Configure `RRB_REQUEST_TIMEOUT_MS` |
 | Backend unavailable | `/readyz` indicates target configuration readiness, while operation errors return unavailable or timeout responses |
 
@@ -405,6 +420,7 @@ Misconfiguration is one of the most likely deployment risks.
 | Missing `RRB_METRICS_TOKEN` | Metrics unavailable | Configure a separate metrics token for monitoring |
 | Large pipeline limit | Request amplification | Lower `RRB_MAX_PIPELINE_COMMANDS` for exposed deployments |
 | High concurrency | Backend overload | Set `RRB_MAX_CONCURRENCY` and `RRB_OPERATION_LIMIT` according to Redis capacity |
+| High realtime concurrency | Excessive Redis connections and bridge file descriptors | Set `RRB_REALTIME_MAX_CONCURRENCY` according to Redis and host capacity |
 | Long request timeout | Resource retention under failure | Keep `RRB_REQUEST_TIMEOUT_MS` bounded |
 | Permissive token file permissions | Local secret exposure | Use owner-only file permissions |
 
@@ -444,15 +460,23 @@ Expected result: the request is rejected if it exceeds `RRB_MAX_PIPELINE_COMMAND
 
 Required controls: set pipeline limits based on deployment needs and keep edge request rate limits in place.
 
-### Abuse case 5. Realtime-only token accesses command route
+### Abuse case 5. Realtime-only token attempts a general command
 
-A client presents a valid token configured with only the `realtime` token type and sends a request to `POST /`.
+A client presents a valid token configured with only the `realtime` token type and sends `GET` or another general Redis command to `POST /`.
 
-Expected result: authentication succeeds, but route authorisation rejects the request with forbidden access before Redis execution.
+Expected result: route authentication succeeds because Realtime needs the command endpoint, but command policy rejects anything outside `EXPIRE`, `PUBLISH`, `XADD`, and `XRANGE`.
 
-Required controls: keep token type checks at route boundaries and test command-route rejection for non-command tokens.
+Required controls: keep the realtime command profile explicit and test that a realtime-only token cannot execute general or administrative commands.
 
-### Abuse case 6. Public scraper accesses `/metrics`
+### Abuse case 6. Realtime connections attempt to exhaust command capacity
+
+A valid realtime client opens many long-lived SSE subscriptions.
+
+Expected result: subscriptions consume only `RRB_REALTIME_MAX_CONCURRENCY`. When that capacity is exhausted, additional subscription requests receive `429` without reducing ordinary command operation capacity.
+
+Required controls: keep the realtime permit lifecycle attached to the SSE response body, configure a safe connection cap, and enforce edge limits per client or token.
+
+### Abuse case 7. Public scraper accesses `/metrics`
 
 An unauthorised client requests `/metrics`.
 
@@ -460,7 +484,7 @@ Expected result: the bridge rejects access unless the request includes the confi
 
 Required controls: configure `RRB_METRICS_TOKEN`, restrict network access to `/metrics`, and avoid public metrics exposure.
 
-### Abuse case 7. Redis returns a very large value
+### Abuse case 8. Redis returns a very large value
 
 A valid client requests a key that contains a very large value.
 
@@ -503,7 +527,7 @@ RRB_REQUEST_TIMEOUT_MS=3000
 
 ### Command, ratelimit, and realtime token profile
 
-Use this profile when a trusted private application should be prepared for the existing command route, `@upstash/ratelimit`, and a future realtime route.
+Use this profile when a trusted private application uses general Redis commands, `@upstash/ratelimit`, and `@upstash/realtime` with one token.
 
 ```bash
 RRB_MODE=env
@@ -515,6 +539,7 @@ RRB_TOKEN_TYPE=command,ratelimit,realtime
 RRB_METRICS_TOKEN=<long-random-metrics-token>
 
 RRB_MAX_CONCURRENCY=1024
+RRB_REALTIME_MAX_CONCURRENCY=256
 RRB_OPERATION_LIMIT=100
 
 RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
@@ -529,7 +554,7 @@ RRB_ACQUIRE_TIMEOUT_MS=100
 RRB_REQUEST_TIMEOUT_MS=5000
 ```
 
-Do not treat `realtime` as a Redis command-policy bypass. It is a route capability only. Do not treat `ratelimit` as general Lua access. It is limited to the Upstash rate-limit command profile.
+Do not treat `realtime` as a general Redis or Pub/Sub bypass. It is limited to the managed subscription route and the four commands required by `@upstash/realtime`. Do not treat `ratelimit` as general Lua access. It is limited to the Upstash rate-limit command profile.
 
 ### Multi-target file mode profile
 
@@ -572,7 +597,7 @@ Use this checklist before deploying the bridge.
 | `Authorization` headers are not logged by proxies | Yes |
 | `RRB_ALLOWED_COMMANDS` is limited to application needs | Yes |
 | `RRB_TOKEN_TYPE` is limited to required route capabilities | Yes |
-| Body, pipeline, argument, concurrency, and timeout limits are reviewed | Yes |
+| Body, pipeline, argument, command concurrency, realtime concurrency, and timeout limits are reviewed | Yes |
 | Redis credentials are not committed to source control | Yes |
 | File-mode config uses private file permissions | Yes, when file mode is used |
 | Docker image digest or signature is verified for production | Recommended |
@@ -589,8 +614,11 @@ Security-sensitive changes should include or preserve tests for the following be
 | Metrics authentication | `/metrics` rejects missing or invalid metrics token |
 | Allowlist policy | Commands not in `RRB_ALLOWED_COMMANDS` are rejected |
 | Hard-denied commands | Dangerous commands are rejected even if configured |
-| Token type route checks | Tokens without `command` are rejected from command routes |
+| Token type route checks | Tokens without `realtime` are rejected from the subscription route, and capability-only tokens cannot exceed their command profiles |
 | Hard-denied scripting | `EVAL`, `EVALSHA`, and `SCRIPT` are rejected for normal `command` tokens even if configured in the allowlist |
+| Realtime unsafe command scope | `PUBLISH` is accepted only for a realtime token, while raw `SUBSCRIBE` remains denied |
+| Realtime SDK flow | Upstash SSE subscription, stream history, expiry, and publish framing are exercised against Redis |
+| Realtime capacity | Active subscriptions hold a dedicated permit that is released when the stream is dropped |
 | Pipeline limits | Excessive pipeline command counts are rejected |
 | Argument limits | Excessive argument count and byte size are rejected |
 | Transaction handling | Raw Redis transaction commands are blocked and `/multi-exec` uses managed atomic execution |
@@ -607,6 +635,7 @@ The following risks remain even when the bridge is configured correctly.
 | Stolen tokens are sufficient for access | Bearer tokens are possession-based credentials |
 | Large Redis responses can still consume memory or bandwidth | Request limits do not bound backend response size |
 | Token capability scope must stay narrow | Extra token types widen route access as new bridge surfaces are added |
+| Pub/Sub delivery is at most once | Redis does not replay messages missed while a subscriber is disconnected. Realtime history relies on Redis Streams for recovery |
 | Redis data sensitivity depends on application design | The bridge does not classify or encrypt Redis values |
 | Private network exposure still matters | Internal services can be compromised or misconfigured |
 | Supply-chain trust depends on release process integrity | Operators must verify artifacts and protect CI/CD permissions |
@@ -623,12 +652,12 @@ The following improvements may further reduce risk for higher-security deploymen
 | Optional HMAC request signing | Reduces replay and token-only misuse risks |
 | mTLS support at reverse proxy layer | Stronger client authentication for internal services |
 | Structured audit log mode | Improves investigation of denied commands and failed auth attempts |
-| Per-token route-specific policy | Separates command and realtime traffic as the route surface grows |
+| Per-token realtime connection limits | Prevents one valid token from consuming the global realtime pool |
 | Config validation report at startup | Makes effective policy easier to review without exposing secrets |
 
 ## Summary
 
-Rubix Redis Bridge provides a narrow, security-focused Redis-over-HTTP layer for private infrastructure. Its main protections are bearer authentication, explicit command policy, hard-denied Redis command groups, request and argument limits, per-target operation limits, Redis timeouts, metrics authentication, non-root Docker execution, and release supply-chain controls.
+Rubix Redis Bridge provides a narrow, security-focused Redis-over-HTTP layer for private infrastructure. Its main protections are bearer authentication, explicit capability and command policy, hard-denied Redis command groups, request and argument limits, separate command and realtime capacity limits, Redis timeouts, metrics authentication, non-root Docker execution, and release supply-chain controls.
 
 The bridge should be deployed as a private infrastructure component. Its security depends on strong tokens, private network placement, narrow command allowlists, protected Redis backends, and careful token type scoping.
 

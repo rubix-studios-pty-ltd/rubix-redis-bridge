@@ -119,4 +119,20 @@ impl AppState {
 
         Ok(route)
     }
+
+    pub(crate) fn realtime_auth(
+        &self,
+        headers: &HeaderMap,
+        ip: IpAddr,
+    ) -> Result<AuthRoute, ApiError> {
+        let route = self.bridge_auth(headers, ip)?;
+
+        if !route.allows_realtime() {
+            return Err(ApiError::forbidden(
+                "Bearer token is not allowed to access realtime routes",
+            ));
+        }
+
+        Ok(route)
+    }
 }

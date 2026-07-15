@@ -59,13 +59,13 @@ impl TokenCaps {
         self.ratelimit
     }
 
-    pub(crate) fn allows_command_route(&self) -> bool {
-        self.command || self.ratelimit
+    pub(crate) fn allows_realtime(&self) -> bool {
+        self.realtime
     }
 
-    //    pub(crate) fn allows_realtime(&self) -> bool {
-    //        self.realtime
-    //    }
+    pub(crate) fn allows_command_route(&self) -> bool {
+        self.command || self.ratelimit || self.realtime
+    }
 
     pub(crate) fn config_value(&self) -> String {
         let mut values = Vec::new();

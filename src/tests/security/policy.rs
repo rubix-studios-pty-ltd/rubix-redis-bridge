@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
 use crate::config::TokenCaps;
 use crate::security::{CommandArg, SecurityPolicy};
-use crate::security::{denied_commands, is_denied_command, ratelimit_commands};
+use crate::security::{denied_commands, is_denied_command, ratelimit_commands, realtime_commands};
 
 fn policy() -> SecurityPolicy {
     SecurityPolicy {
@@ -27,6 +27,12 @@ fn ratelimit_policy() -> SecurityPolicy {
     policy
 }
 
+fn realtime_policy() -> SecurityPolicy {
+    let mut policy = policy();
+    policy.max_command_args = 16;
+    policy
+}
+
 fn command_token() -> TokenCaps {
     TokenCaps::parse("command", "test").unwrap()
 }
@@ -37,6 +43,10 @@ fn ratelimit_token() -> TokenCaps {
 
 fn command_ratelimit_token() -> TokenCaps {
     TokenCaps::parse("command,ratelimit", "test").unwrap()
+}
+
+fn realtime_token() -> TokenCaps {
+    TokenCaps::parse("realtime", "test").unwrap()
 }
 
 fn command(value: Value) -> Vec<CommandArg> {
@@ -66,7 +76,7 @@ fn error_contains_for(
 #[test]
 fn accept_normal_commands() {
     for command in ["GET", "SET"] {
-        assert!(!is_denied_command(command, false));
+        assert!(!is_denied_command(command, false, false));
     }
 }
 
@@ -80,7 +90,7 @@ fn build_denied_command() {
 #[test]
 fn reject_denied_commands() {
     for command in DENIED_COMMANDS.iter().copied() {
-        assert!(is_denied_command(command, false));
+        assert!(is_denied_command(command, false, false));
     }
 }
 
@@ -142,11 +152,11 @@ fn accept_valid_command_when_arg_max() {
 #[test]
 fn accept_ratelimit_profile() {
     for command in ["EVAL", "EVALSHA", "SCRIPT"] {
-        assert!(!is_denied_command(command, true));
+        assert!(!is_denied_command(command, true, false));
     }
 
     for command in ["EVAL_RO", "EVALSHA_RO", "FCALL", "FUNCTION", "CONFIG"] {
-        assert!(is_denied_command(command, true));
+        assert!(is_denied_command(command, true, false));
     }
 }
 
@@ -173,7 +183,7 @@ fn reject_ratelimit_commands_without_ratelimit() {
 }
 
 #[test]
-fn rejects_standard_commands_ratelimit() {
+fn rejects_general_commands_ratelimit() {
     error_contains_for(
         &policy(),
         json!(["GET", "key"]),
@@ -257,5 +267,67 @@ fn reject_user_blocked_ratelimit_command() {
         json!(["EVAL", "return 1", 0]),
         "blocked by policy",
         &ratelimit_token(),
+    );
+}
+
+#[test]
+fn build_realtime_command() {
+    for command in ["EXPIRE", "PUBLISH", "XADD", "XRANGE"] {
+        assert!(realtime_commands().contains(command));
+    }
+}
+
+#[test]
+fn accept_realtime_profile() {
+    assert!(is_denied_command("PUBLISH", false, false));
+    assert!(!is_denied_command("PUBLISH", false, true));
+    assert!(is_denied_command("SUBSCRIBE", false, true));
+}
+
+#[test]
+fn accept_realtime_command() {
+    let policy = realtime_policy();
+    let token = realtime_token();
+
+    for value in [
+        json!(["EXPIRE", "channel", 60]),
+        json!(["PUBLISH", "channel", "{}"]),
+        json!(["XADD", "channel", "*", "data", "{}"]),
+        json!(["XRANGE", "channel", "-", "+"]),
+    ] {
+        assert!(policy.parse_command(&command(value), &token).is_ok());
+    }
+}
+
+#[test]
+fn reject_general_commands_realtime() {
+    error_contains_for(
+        &policy(),
+        json!(["GET", "key"]),
+        "not allowed for this token type",
+        &realtime_token(),
+    );
+}
+
+#[test]
+fn reject_realtime_commands_without_realtime() {
+    error_contains_for(
+        &realtime_policy(),
+        json!(["PUBLISH", "channel", "{}"]),
+        "hard-denied",
+        &command_token(),
+    );
+}
+
+#[test]
+fn reject_user_blocked_realtime_blocked_command() {
+    let mut policy = realtime_policy();
+    policy.blocked_commands.insert("PUBLISH".to_string());
+
+    error_contains_for(
+        &policy,
+        json!(["PUBLISH", "channel", "{}"]),
+        "blocked by policy",
+        &realtime_token(),
     );
 }

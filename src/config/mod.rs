@@ -9,7 +9,7 @@ use std::time::Duration;
 use anyhow::bail;
 
 use crate::client::TrustedProxies;
-use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS};
+use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS, REALTIME_COMMANDS};
 use crate::security::SecurityPolicy;
 
 pub(crate) use hash::TokenHash;
@@ -33,6 +33,7 @@ pub struct Bridge {
     pub security: SecurityPolicy,
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
+    pub max_realtime_concurrency: usize,
     pub request_timeout: Duration,
     pub acquire_timeout: Duration,
     pub max_response_bytes: usize,
@@ -73,6 +74,7 @@ impl fmt::Debug for Bridge {
             .field("security", &self.security)
             .field("max_body_bytes", &self.max_body_bytes)
             .field("max_concurrency", &self.max_concurrency)
+            .field("max_realtime_concurrency", &self.max_realtime_concurrency)
             .field("request_timeout", &self.request_timeout)
             .field("acquire_timeout", &self.acquire_timeout)
             .field("max_response_bytes", &self.max_response_bytes)
@@ -119,6 +121,7 @@ impl Bridge {
         let port = parse_env_or_default("RRB_PORT", 8080)?;
         let max_body_bytes = parse_env_or_default("RRB_MAX_BODY_BYTES", 1024 * 1024)?;
         let max_concurrency = parse_env_or_default("RRB_MAX_CONCURRENCY", 1024)?;
+        let max_realtime_concurrency = parse_env_or_default("RRB_REALTIME_MAX_CONCURRENCY", 1024)?;
         let max_pipeline_commands = parse_env_or_default("RRB_MAX_PIPELINE_COMMANDS", 1000)?;
         let max_command_args = parse_env_or_default("RRB_MAX_COMMAND_ARGS", 256)?;
         let max_arg_bytes = parse_env_or_default("RRB_MAX_ARG_BYTES", 256 * 1024)?;
@@ -155,7 +158,7 @@ impl Bridge {
             .unwrap_or_else(|| parse_command_list(ALLOWED_COMMANDS));
 
         let mut blocked_commands = parse_command_list(DENIED_COMMANDS);
-        for &command in RATELIMIT_COMMANDS {
+        for &command in RATELIMIT_COMMANDS.iter().chain(REALTIME_COMMANDS) {
             blocked_commands.remove(command);
         }
 
@@ -190,6 +193,14 @@ impl Bridge {
         };
 
         security.validate()?;
+
+        if max_concurrency == 0 {
+            bail!("RRB_MAX_CONCURRENCY must be greater than zero");
+        }
+
+        if max_realtime_concurrency == 0 {
+            bail!("RRB_REALTIME_MAX_CONCURRENCY must be greater than zero");
+        }
 
         if request_timeout_ms == 0 {
             bail!("RRB_REQUEST_TIMEOUT_MS must be greater than zero");
@@ -233,6 +244,7 @@ impl Bridge {
             security,
             max_body_bytes,
             max_concurrency,
+            max_realtime_concurrency,
             request_timeout: Duration::from_millis(request_timeout_ms),
             acquire_timeout: Duration::from_millis(acquire_timeout_ms),
             max_response_bytes,
