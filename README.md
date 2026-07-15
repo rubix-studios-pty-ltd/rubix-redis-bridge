@@ -1,10 +1,10 @@
 # Rubix Redis Bridge
 
-Rubix Redis Bridge is a secure self-hosted HTTP gateway for Redis-compatible backends, designed for teams that use Upstash Redis SDKs but need private infrastructure, KV backend variant support, stricter command policy, and operational control.
+Rubix Redis Bridge is a secure self-hosted HTTP gateway for Redis-compatible backends, designed for teams that prefer the ease and simplicity of Upstash SDKs or simple Post API commands but require private and secure infrastructure, KV backend variant support, stricter command policy, and operational control.
 
-It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
+Rubix Redis Bridge provides a controlled Redis REST API for internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
 
-Applications can use the supported `@upstash/redis`, `@upstash/ratelimit`, and `@upstash/realtime` flows while the bridge enforces authentication, policy, limits, and per-target controls.
+Applications can use supported `@upstash/redis`, `@upstash/ratelimit`, and `@upstash/realtime` flows while the bridge enforces authentication, policy, limits, and per-target controls.
 
 [![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml) [![Release](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml) [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -14,6 +14,7 @@ Rubix Redis Bridge provides the core components required to expose Redis safely 
 
 - Redis over HTTP
 - `@upstash/redis` SDK support
+- `@upstash/ratelimit` SDK support
 - `@upstash/realtime` SDK support
 - Single commands
 - Pipeline requests
