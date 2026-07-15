@@ -4,8 +4,8 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Realtime } from '@upstash/realtime'
 import { Redis } from '@upstash/redis'
 
-const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:7777'
-const token = process.env.RRB_TOKEN ?? 'replace-with-strong-http-token'
+const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:8080'
+const token = process.env.RRB_TOKEN ?? 'test-bridge-token'
 
 if (!token) {
   throw new Error('RRB_TOKEN is required for tests')
