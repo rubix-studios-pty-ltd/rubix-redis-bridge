@@ -1,6 +1,6 @@
 # Rubix Redis Bridge
 
-Rubix Redis Bridge is a secure self-hosted HTTP gateway for Redis-compatible backends, designed for teams that use Upstash-style Redis SDKs but need private infrastructure, Valkey support, stricter command policy, and operational control.
+Rubix Redis Bridge is a secure self-hosted HTTP gateway for Redis-compatible backends, designed for teams that use Upstash Redis SDKs but need private infrastructure, KV backend variant support, stricter command policy, and operational control.
 
 It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
 
@@ -38,7 +38,7 @@ Security controls are applied before requests reach Redis, reducing the risk of 
 - Request size limits
 - Argument limits
 - Redis timeouts
-- Realtime limit
+- Realtime limits
 - Metrics token
 - Non-root container
 
