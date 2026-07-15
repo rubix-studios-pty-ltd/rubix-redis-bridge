@@ -1,3 +1,52 @@
+## [1.1.0] - 2026-07-15
+
+### Features
+
+- Enhance token management and command authorization
+- Realtime compatability with upstash realtime sdk
+- Integrate Redis client into RedisTarget for improved connection management
+
+### Bug Fixes
+
+- Ambiguous response size metrics
+- Bug ratelimit commands bypass fail close
+
+### Refactor
+
+- Rename AuthFailureResult to AuthFailure and update related logic
+- Reorganize authentication module and remove unused tests
+- Update module paths for headers, parse, and trusted components
+- Enhance lockout functionality with new methods and improved assertions
+- Reorganize security module and remove obsolete tests
+- Remove obsolete hash and targets tests
+- Remove obsolete test files for headers, parse, and trusted modules
+- Remove obsolete authentication and lockout test files
+- Reorganize Redis module and remove obsolete components
+- Update module imports in auth test structure
+- Update module exports for testing in various components
+- Move is_locked_at method for better test organization
+- Remove obsolete database test script
+- Streamline module exports for testing across multiple components
+- Remove obsolete authentication and security test files
+- Update test messages for clarity and consistency
+- Rename token_type module to token and update exports
+- Clean up whitespace in Upstash SDK tests
+- Rename TokenTypes to TokenCaps for improved clarity
+
+### Documentation
+
+- Update README to clarify Rubix Redis Bridge functionality
+- Update README to reflect changes in token types and command authorization
+
+### Miscellaneous Tasks
+
+- Update npm version command to ignore scripts during release preparation
+- Update dependencies and configuration settings
+- Update dependencies in Cargo.lock
+- Update GitHub Actions workflows to use latest action versions
+- Update dependencies in Cargo.lock and package.json
+- Update Node.js action version in build workflow to v7.0.0
+
 ## [1.0.1] - 2026-07-06
 
 ### Bug Fixes
