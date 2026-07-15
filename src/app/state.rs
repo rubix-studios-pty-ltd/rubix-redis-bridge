@@ -34,6 +34,7 @@ pub struct AppState {
 
 pub(crate) struct RedisTarget {
     pub(crate) config: Redis,
+    client: redis::Client,
     connections: Vec<OnceCell<ConnectionManager>>,
     next_connection: AtomicUsize,
     operation_limit: Semaphore,
@@ -107,12 +108,18 @@ impl AppState {
                 );
             }
 
+            let client = redis::Client::open(target_config.connection_string.as_str())
+                .with_context(|| {
+                    format!("Invalid Redis URL for target {}", target_config.rrb_id)
+                })?;
+
             let connections: Vec<OnceCell<ConnectionManager>> = (0..target_config
                 .connection_shards)
                 .map(|_| OnceCell::new())
                 .collect();
 
             let target = Arc::new(RedisTarget {
+                client,
                 operation_limit: Semaphore::new(target_config.operation_limit),
                 connections,
                 next_connection: AtomicUsize::new(0),
@@ -250,12 +257,7 @@ impl RedisTarget {
 
         let connection = self.connections[shard]
             .get_or_try_init(|| async {
-                let client = redis::Client::open(self.config.connection_string.as_str())
-                    .with_context(|| {
-                        format!("Invalid Redis URL for target {}", self.config.rrb_id)
-                    })?;
-
-                client.get_connection_manager().await.with_context(|| {
+                self.client.get_connection_manager().await.with_context(|| {
                     format!(
                         "Failed to connect to Redis target {} connection shard {}",
                         self.config.rrb_id, shard
@@ -268,10 +270,7 @@ impl RedisTarget {
     }
 
     pub(crate) async fn pubsub(&self) -> anyhow::Result<redis::aio::PubSub> {
-        let client = redis::Client::open(self.config.connection_string.as_str())
-            .with_context(|| format!("Invalid Redis URL for target {}", self.config.rrb_id))?;
-
-        client.get_async_pubsub().await.with_context(|| {
+        self.client.get_async_pubsub().await.with_context(|| {
             format!(
                 "Failed to connect realtime subscription for Redis target {}",
                 self.config.rrb_id
