@@ -1,4 +1,5 @@
 mod collectors;
+mod connection;
 mod guard;
 
 use anyhow::Context;
@@ -7,6 +8,7 @@ use prometheus::{
 };
 
 use self::collectors::Collectors;
+pub use self::connection::ConnectionGuard;
 pub use self::guard::Guard;
 
 #[derive(Clone)]
@@ -23,6 +25,8 @@ pub struct Metrics {
     pub redis_operations_total: IntCounterVec,
     pub redis_operation_duration: HistogramVec,
     pub redis_operations_inflight: IntGaugeVec,
+    pub realtime_total: IntCounterVec,
+    pub realtime_inflight: IntGaugeVec,
     pub configured_targets: IntGauge,
 }
 
@@ -46,6 +50,8 @@ impl Metrics {
             redis_operations_total: collectors.redis_operations_total,
             redis_operation_duration: collectors.redis_operation_duration,
             redis_operations_inflight: collectors.redis_operations_inflight,
+            realtime_total: collectors.realtime_total,
+            realtime_inflight: collectors.realtime_inflight,
             configured_targets: collectors.configured_targets,
         })
     }
@@ -85,6 +91,19 @@ impl Metrics {
         self.command_denied_total
             .with_label_values(&[target, kind])
             .inc();
+    }
+
+    pub fn realtime_connection(&self, target: impl Into<String>) -> ConnectionGuard {
+        let target = target.into();
+
+        self.realtime_total
+            .with_label_values(&[target.as_str()])
+            .inc();
+        self.realtime_inflight
+            .with_label_values(&[target.as_str()])
+            .inc();
+
+        ConnectionGuard::new(self.clone(), target)
     }
 
     pub fn auth_failed(&self) {

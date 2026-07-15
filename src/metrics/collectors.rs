@@ -14,6 +14,8 @@ pub(super) struct Collectors {
     pub(super) redis_operations_total: IntCounterVec,
     pub(super) redis_operation_duration: HistogramVec,
     pub(super) redis_operations_inflight: IntGaugeVec,
+    pub(super) realtime_total: IntCounterVec,
+    pub(super) realtime_inflight: IntGaugeVec,
     pub(super) configured_targets: IntGauge,
 }
 
@@ -89,6 +91,22 @@ impl Collectors {
             &["target", "kind"],
         )?;
 
+        let realtime_total = IntCounterVec::new(
+            Opts::new(
+                "rrb_realtime_total",
+                "Total accepted realtime subscription connections.",
+            ),
+            &["target"],
+        )?;
+
+        let realtime_inflight = IntGaugeVec::new(
+            Opts::new(
+                "rrb_realtime_inflight",
+                "Current realtime subscription connections.",
+            ),
+            &["target"],
+        )?;
+
         let configured_targets = IntGauge::with_opts(Opts::new(
             "rrb_configured_targets",
             "Number of configured Redis bridge targets.",
@@ -106,6 +124,8 @@ impl Collectors {
             redis_operations_total,
             redis_operation_duration,
             redis_operations_inflight,
+            realtime_total,
+            realtime_inflight,
             configured_targets,
         })
     }
@@ -122,6 +142,8 @@ impl Collectors {
         registry.register(Box::new(self.redis_operations_total.clone()))?;
         registry.register(Box::new(self.redis_operation_duration.clone()))?;
         registry.register(Box::new(self.redis_operations_inflight.clone()))?;
+        registry.register(Box::new(self.realtime_total.clone()))?;
+        registry.register(Box::new(self.realtime_inflight.clone()))?;
         registry.register(Box::new(self.configured_targets.clone()))?;
 
         Ok(())

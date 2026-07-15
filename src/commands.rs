@@ -200,6 +200,8 @@ pub(crate) const DENIED_COMMANDS: &[&str] = &[
 
 pub(crate) const RATELIMIT_COMMANDS: &[&str] = &["EVAL", "EVALSHA", "SCRIPT"];
 
+pub(crate) const REALTIME_COMMANDS: &[&str] = &["EXPIRE", "PUBLISH", "XADD", "XRANGE"];
+
 #[cfg(test)]
 pub(crate) const CONNECTION_COMMANDS: &[&str] = &[
     "SELECT",

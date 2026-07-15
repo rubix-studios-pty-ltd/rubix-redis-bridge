@@ -2,7 +2,7 @@
   "name": "@rubix-studios-pty-ltd/rubix-redis-bridge",
   "title": "Rubix Redis Bridge",
   "version": "1.0.1",
-  "description": "Secure Rust HTTP bridge for Redis with Upstash-style API compatibility, command allowlisting, hard-denied dangerous Redis commands, Docker deployment, and SDK compatibility tests.",
+  "description": "Secure Rust HTTP bridge for Redis with Upstash Redis, Ratelimit, and Realtime compatibility, scoped command policy, Docker deployment, and SDK tests.",
   "license": "MIT",
   "private": false,
   "type": "module",
@@ -33,6 +33,8 @@
     "redis-proxy",
     "upstash",
     "upstash-redis",
+    "upstash-realtime",
+    "realtime",
     "docker",
     "docker-image",
     "axum",
@@ -61,6 +63,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.3",
     "@upstash/ratelimit": "latest",
+    "@upstash/realtime": "1.0.4",
     "@upstash/redis": "latest",
     "ioredis": "^5.11.1",
     "undici": "^8.7.0"

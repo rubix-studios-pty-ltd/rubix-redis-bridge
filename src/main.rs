@@ -18,7 +18,9 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
-use crate::app::{AppState, command, healthz, metrics, multi_exec, pipeline, readyz, root};
+use crate::app::{
+    AppState, command, healthz, metrics, multi_exec, pipeline, readyz, root, subscribe,
+};
 use crate::config::Bridge;
 
 #[tokio::main]
@@ -32,12 +34,14 @@ async fn main() -> anyhow::Result<()> {
 
     let body_limit = config.max_body_bytes;
     let max_concurrency = config.max_concurrency;
+    let max_realtime_concurrency = config.max_realtime_concurrency;
     let state = Arc::new(AppState::new(config)?);
 
     info!(
         bind = %bind,
         target_count = state.target_count(),
         max_concurrency,
+        max_realtime_concurrency,
         body_limit,
         "Redis bridge starting"
     );
@@ -54,8 +58,13 @@ async fn main() -> anyhow::Result<()> {
         .layer(DefaultBodyLimit::max(body_limit))
         .layer(ConcurrencyLimitLayer::new(max_concurrency));
 
+    let realtime = Router::new()
+        .route("/subscribe/{*channel}", post(subscribe))
+        .layer(DefaultBodyLimit::max(body_limit));
+
     let app = health
         .merge(api)
+        .merge(realtime)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

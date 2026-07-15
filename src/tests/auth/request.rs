@@ -59,6 +59,7 @@ fn test_state(auth_lockout_failures: usize) -> AppState {
         },
         max_body_bytes: 1024,
         max_concurrency: 16,
+        max_realtime_concurrency: 1,
         request_timeout: Duration::from_millis(500),
         acquire_timeout: Duration::from_millis(100),
         max_response_bytes: 1024 * 1024,
@@ -105,6 +106,7 @@ fn test_hmac() -> AppState {
         },
         max_body_bytes: 1024,
         max_concurrency: 16,
+        max_realtime_concurrency: 1,
         request_timeout: Duration::from_millis(500),
         acquire_timeout: Duration::from_millis(100),
         max_response_bytes: 1024 * 1024,
@@ -269,7 +271,7 @@ fn accepts_hmac_hashed_token() {
 }
 
 #[test]
-fn rejects_standard_commands_realtime() {
+fn accepts_realtime_routes_for_realtime_token() {
     let targets = vec![Redis {
         rrb_id: "test_redis".to_string(),
         connection_string: "redis://default:password@127.0.0.1:6379".to_string(),
@@ -301,6 +303,7 @@ fn rejects_standard_commands_realtime() {
         },
         max_body_bytes: 1024,
         max_concurrency: 16,
+        max_realtime_concurrency: 1,
         request_timeout: Duration::from_millis(500),
         acquire_timeout: Duration::from_millis(100),
         max_response_bytes: 1024 * 1024,
@@ -318,8 +321,30 @@ fn rejects_standard_commands_realtime() {
     let valid_headers = auth_headers("valid-token");
 
     assert!(state.bridge_auth(&valid_headers, ip).is_ok());
+    assert!(state.command_auth(&valid_headers, ip).is_ok());
+    assert!(state.realtime_auth(&valid_headers, ip).is_ok());
+}
+
+#[test]
+fn rejects_realtime_route_for_command_token() {
+    let state = test_state(3);
+    let ip = ip("203.0.113.10");
+    let valid_headers = auth_headers("valid-token");
+
     assert_eq!(
-        error_status(state.command_auth(&valid_headers, ip).unwrap_err()),
+        error_status(state.realtime_auth(&valid_headers, ip).unwrap_err()),
         StatusCode::FORBIDDEN
     );
+}
+
+#[test]
+fn realtime_capacity_is_independent_and_released() {
+    let state = test_state(3);
+    let permit = state.acquire_realtime().unwrap();
+
+    assert!(state.acquire_realtime().is_err());
+
+    drop(permit);
+
+    assert!(state.acquire_realtime().is_ok());
 }

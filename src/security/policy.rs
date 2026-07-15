@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail};
 
 use crate::config::TokenCaps;
 
-use super::deny::{is_denied_command, ratelimit_commands, reject_command};
+use super::deny::{is_denied_command, ratelimit_commands, realtime_commands, reject_command};
 use super::script::validate_subcommand;
 use super::types::{CommandArg, RedisCommand};
 
@@ -40,7 +40,7 @@ impl SecurityPolicy {
         let hard_denied_allowed = self
             .allowed_commands
             .iter()
-            .filter(|command| is_denied_command(command, false))
+            .filter(|command| is_denied_command(command, false, false))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -109,11 +109,12 @@ impl SecurityPolicy {
         }
 
         let allow_ratelimit = token_type.allows_ratelimit();
+        let allow_realtime = token_type.allows_realtime();
 
         if command_name == "SCRIPT" && allow_ratelimit {
             validate_subcommand(array)?;
         } else {
-            reject_command(&command_name, allow_ratelimit)?;
+            reject_command(&command_name, allow_ratelimit, allow_realtime)?;
         }
 
         let standard_allowed =
@@ -122,7 +123,10 @@ impl SecurityPolicy {
         let ratelimit_allowed =
             allow_ratelimit && ratelimit_commands().contains(command_name.as_str());
 
-        if !standard_allowed && !ratelimit_allowed {
+        let realtime_allowed =
+            allow_realtime && realtime_commands().contains(command_name.as_str());
+
+        if !standard_allowed && !ratelimit_allowed && !realtime_allowed {
             bail!("Redis command is not allowed for this token type: {command_name}");
         }
 

@@ -4,7 +4,7 @@ Rubix Redis Bridge is a secure self-hosted HTTP gateway for Redis-compatible bac
 
 It provides controlled Redis-over-HTTP access for private infrastructure, internal services, Docker networks, Tailscale networks, serverless workloads, and application integrations that cannot connect to Redis over TCP.
 
-Applications can use API or supported `@upstash/redis` SDK command flow while the bridge enforces authentication, policy, limits, and per-target controls.
+Applications can use the supported `@upstash/redis`, `@upstash/ratelimit`, and `@upstash/realtime` flows while the bridge enforces authentication, policy, limits, and per-target controls.
 
 [![CI](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/ci.yml) [![Release](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/actions/workflows/release.yml) [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge/network/updates) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -14,9 +14,11 @@ Rubix Redis Bridge provides the core components required to expose Redis safely 
 
 - Redis over HTTP
 - `@upstash/redis` SDK support
+- `@upstash/realtime` SDK support
 - Single commands
 - Pipeline requests
 - Managed transactions
+- Realtime SSE subscriptions
 - Bearer token access
 - Command policy controls
 - Multi-target file mode
@@ -36,6 +38,7 @@ Security controls are applied before requests reach Redis, reducing the risk of 
 - Request size limits
 - Argument limits
 - Redis timeouts
+- Realtime limit
 - Metrics token
 - Non-root container
 
@@ -84,6 +87,7 @@ GET  /
 POST /
 POST /pipeline
 POST /multi-exec
+POST /subscribe/<channel>
 GET  /healthz
 GET  /readyz
 GET  /metrics
@@ -125,6 +129,8 @@ Use `POST /pipeline` for non-atomic batches.
 
 Use `POST /multi-exec` for managed transactions. Raw `MULTI`, `EXEC`, `WATCH`, `UNWATCH`, and `DISCARD` are blocked because they alter connection state on shared Redis connections.
 
+`POST /subscribe/<channel>` implements the SSE subscription flow used by `@upstash/redis`. It requires a token with the `realtime` capability. Each subscription receives a dedicated Redis Pub/Sub connection and does not consume ordinary command concurrency or a per-target operation permit.
+
 ## Upstash SDK
 
 Rubix Redis Bridge has been tested with `@upstash/redis` across the supported command surface, including single commands, pipelines, managed transactions, and pipeline error handling.
@@ -136,6 +142,30 @@ Restricted allowlist example:
 ```bash
 RRB_ALLOWED_COMMANDS=PING,GET,GETDEL,MGET,SET,SETEX,DEL,EXISTS,EXPIRE,TTL,INCR,DECR,HGET,HSET,HDEL,HMGET,HGETALL,ZINCRBY
 ```
+
+### Realtime
+
+`@upstash/realtime` uses `XADD`, `XRANGE`, `EXPIRE`, `PUBLISH`, and the SDK subscription endpoint. The `realtime` token capability grants only this command profile and `POST /subscribe/<channel>`. These commands do not need to be added to `RRB_ALLOWED_COMMANDS`.
+
+```ts
+import { Realtime } from '@upstash/realtime'
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({
+  url: 'https://redis-bridge.example.com',
+  token: process.env.RRB_TOKEN,
+})
+
+const realtime = new Realtime({
+  redis,
+  history: {
+    expireAfterSecs: 3600,
+    maxLength: 1000,
+  },
+})
+```
+
+Realtime channels may contain path separators such as `/`. Commas, line breaks, and null characters are rejected because they conflict with the Upstash SSE message framing.
 
 ## Backend
 
@@ -161,6 +191,10 @@ RRB_TOKEN_TYPE=command,ratelimit,realtime
 
 `ratelimit` allows the restricted Upstash rate-limit command profile on the same command routes. This currently permits `EVAL`, `EVALSHA`, and safe `SCRIPT` subcommands required by `@upstash/ratelimit`, while keeping `EVAL_RO`, `EVALSHA_RO`, `FCALL`, `FUNCTION`, and other high-risk commands denied. A token with only `ratelimit` can access command routes, but only for the ratelimit profile.
 
+`realtime` allows the exact command profile required by `@upstash/realtime`: `EXPIRE`, `PUBLISH`, `XADD`, and `XRANGE`. It also allows `POST /subscribe/<channel>`. A token with only `realtime` cannot execute general Redis commands.
+
+Use `command,realtime` when one Redis client also needs general command access. Add `ratelimit` only when the same token uses `@upstash/ratelimit`.
+
 In file mode, set `token_type` per token. If omitted, the token defaults to `command`.
 
 ## Command policy
@@ -181,7 +215,7 @@ becomes:
 GET,SET,DEL
 ```
 
-`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands. The only scoped exception is the `ratelimit` token type, which allows the restricted `EVAL`, `EVALSHA`, and `SCRIPT` profile unless those commands are explicitly added to `RRB_BLOCKED_COMMANDS`.
+`RRB_BLOCKED_COMMANDS` is additive. The bridge applies default blocks first, then adds custom blocked commands. Custom config cannot remove default blocks or re-enable hard-denied commands. Scoped exceptions exist for the `ratelimit` command profile and `PUBLISH` with a `realtime` token. Any scoped command can still be disabled by adding it to `RRB_BLOCKED_COMMANDS`.
 
 ## Hard-denied commands
 
@@ -193,7 +227,7 @@ Default-denied scripting and function commands for normal `command` tokens:
 EVAL, EVAL_RO, EVALSHA, EVALSHA_RO, FCALL, FCALL_RO, FUNCTION, SCRIPT
 ```
 
-For tokens with `ratelimit`, only `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands are removed from the hard-deny path. Other denied command groups include administrative, connection-state, transaction-state, destructive, replication, persistence, blocking, pub/sub, expensive, and observability commands.
+For tokens with `ratelimit`, only `EVAL`, `EVALSHA`, and validated `SCRIPT` subcommands are removed from the hard-deny path. For tokens with `realtime`, only `PUBLISH` receives a hard-deny exception. `SUBSCRIBE` and `UNSUBSCRIBE` remain blocked as raw commands and are managed through the dedicated SSE route and connection lifecycle.
 
 Examples:
 
@@ -225,6 +259,7 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_TRUST_PROXY_HEADERS` | `false` | Enables client IP resolution from trusted proxy headers |
 | `RRB_TRUSTED_PROXIES` | none | Trusted proxy IP addresses or CIDR ranges |
 | `RRB_MAX_CONCURRENCY` | `1024` | Global HTTP API concurrency limit |
+| `RRB_REALTIME_MAX_CONCURRENCY` | `1024` | Maximum active realtime SSE subscriptions |
 | `RRB_OPERATION_LIMIT` | `100` | Maximum in-flight Redis operations per target |
 | `RRB_CONNECTION_SHARDS` | `4` | Redis `ConnectionManager` shards per target |
 | `RRB_ALLOWED_COMMANDS` | conservative default | Allowed Redis commands |
@@ -242,6 +277,8 @@ Configuration controls how the bridge binds, authenticates requests, connects to
 | `RRB_ACQUIRE_TIMEOUT_MS` | `100` | Timeout while waiting for per-target Redis operation capacity |
 
 `RRB_MAX_CONCURRENCY` limits the number of concurrent HTTP requests handled by the bridge. It is a global API-level limit.
+
+`RRB_REALTIME_MAX_CONCURRENCY` independently limits active SSE subscriptions. A permit is retained until the client disconnects or the Redis Pub/Sub connection closes. Realtime connections do not use `RRB_MAX_CONCURRENCY`, `RRB_OPERATION_LIMIT`, or the shared command connection shards after setup.
 
 `RRB_OPERATION_LIMIT` limits the number of Redis operations that may be in flight for a single Redis target. This is the per-target admission-control and backpressure limit.
 
@@ -379,6 +416,8 @@ Metrics:
 | `rrb_redis_operations_total` | Redis operations executed. |
 | `rrb_redis_operation_duration_seconds` | Redis operation latency. |
 | `rrb_inflight_redis_operations` | In-flight Redis operations. |
+| `rrb_realtime_total` | Accepted realtime connections. |
+| `rrb_realtime_inflight` | Active realtime connections. |
 | `rrb_configured_targets` | Loaded Redis targets. |
 
 Prometheus:

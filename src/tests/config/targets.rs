@@ -158,7 +158,7 @@ fn parses_file_token_type() {
 
     assert!(targets[0].tokens[0].token_type.allows_command());
     assert!(targets[0].tokens[0].token_type.allows_ratelimit());
-    //    assert!(targets[0].tokens[0].token_type.allows_realtime());
+    assert!(targets[0].tokens[0].token_type.allows_realtime());
 }
 
 #[test]

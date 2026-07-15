@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Ratelimit } from '@upstash/ratelimit'
+import { Realtime } from '@upstash/realtime'
 import { Redis } from '@upstash/redis'
 
 const url = process.env.RRB_TEST_URL ?? 'http://127.0.0.1:7777'
-const token = process.env.RRB_TOKEN
+const token = process.env.RRB_TOKEN ?? 'replace-with-strong-http-token'
 
 if (!token) {
   throw new Error('RRB_TOKEN is required for tests')
@@ -71,6 +72,21 @@ async function scriptFlushDisabled(t) {
   }
 
   assert.fail(`Unexpected SCRIPT FLUSH failure: ${JSON.stringify(command.body)}`)
+}
+
+async function realtimeDisabled(t) {
+  const command = await rawCommand(['PUBLISH', 'sdk:realtime:probe', '{}'])
+
+  if (command.status === 200) {
+    return false
+  }
+
+  if (policy(command)) {
+    t.skip('Bridge is running without token_type=realtime')
+    return true
+  }
+
+  assert.fail(`Unexpected PUBLISH probe failure: ${JSON.stringify(command.body)}`)
 }
 
 test('Test(@upstash/redis): single string commands', async () => {
@@ -284,6 +300,70 @@ test('Test(@upstash/redis): connection-state commands rejected', async () => {
 
   assert.equal(result.status, 400)
   assert.ok(result.error)
+})
+
+test('Test(@upstash/realtime): emit, history, and SSE subscription', async (t) => {
+  if (await realtimeDisabled(t)) {
+    return
+  }
+
+  const channel = `sdk/realtime/${Date.now()}`
+  const realtime = new Realtime({
+    redis,
+    history: {
+      expireAfterSecs: 60,
+      maxLength: 1000,
+    },
+  })
+  const realtimeChannel = realtime.channel(channel)
+  let resolveMessage
+  const message = new Promise((resolve) => {
+    resolveMessage = resolve
+  })
+  // The SDK heartbeat is application-lifetime state. It must not keep the
+  // standalone Node test process alive after the HTTP subscriber is aborted.
+  const nativeSetInterval = globalThis.setInterval
+  globalThis.setInterval = (...args) => {
+    const timer = nativeSetInterval(...args)
+    timer.unref()
+    return timer
+  }
+  let unsubscribe
+
+  try {
+    unsubscribe = await realtimeChannel.subscribe({
+      events: ['updated'],
+      onData: resolveMessage,
+    })
+  } finally {
+    globalThis.setInterval = nativeSetInterval
+  }
+
+  try {
+    await realtimeChannel.emit('updated', { value: 'hello' })
+
+    let messageTimeout
+    const received = await Promise.race([
+      message,
+      new Promise((_, reject) => {
+        messageTimeout = setTimeout(
+          () => reject(new Error('Timed out waiting for Realtime event')),
+          5000
+        )
+      }),
+    ])
+    clearTimeout(messageTimeout)
+    const history = await realtimeChannel.history()
+
+    assert.equal(received.channel, channel)
+    assert.equal(received.event, 'updated')
+    assert.deepEqual(received.data, { value: 'hello' })
+    assert.ok(received.id)
+    assert.deepEqual(history.at(-1), received)
+  } finally {
+    await unsubscribe?.()
+    await redis.del(channel)
+  }
 })
 
 test('Test(@upstash/ratelimit): fixed window with token_type=ratelimit', async (t) => {

@@ -8,7 +8,7 @@ use std::time::Duration;
 use anyhow::Context;
 use axum::http::HeaderMap;
 use redis::aio::ConnectionManager;
-use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
+use tokio::sync::{OnceCell, OwnedSemaphorePermit, Semaphore, SemaphorePermit, TryAcquireError};
 
 use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
@@ -29,6 +29,7 @@ pub struct AppState {
     pub(crate) auth_lockout: AuthLockout,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) trusted_proxies: TrustedProxies,
+    realtime_limit: Arc<Semaphore>,
 }
 
 pub(crate) struct RedisTarget {
@@ -55,6 +56,10 @@ impl fmt::Debug for AppState {
             .field("max_response_bytes", &self.max_response_bytes)
             .field("trust_proxy_headers", &self.trust_proxy_headers)
             .field("trusted_proxy_count", &self.trusted_proxies.len())
+            .field(
+                "realtime_permits_available",
+                &self.realtime_limit.available_permits(),
+            )
             .finish()
     }
 }
@@ -154,6 +159,7 @@ impl AppState {
             ),
             trust_proxy_headers: config.trust_proxy_headers,
             trusted_proxies: config.trusted_proxies,
+            realtime_limit: Arc::new(Semaphore::new(config.max_realtime_concurrency)),
         })
     }
 
@@ -183,6 +189,10 @@ impl AppState {
 
     pub(crate) fn security(&self) -> &SecurityPolicy {
         &self.security
+    }
+
+    pub(crate) fn acquire_realtime(&self) -> Result<OwnedSemaphorePermit, TryAcquireError> {
+        self.realtime_limit.clone().try_acquire_owned()
     }
 
     pub(crate) fn client_ip(&self, headers: &HeaderMap, peer: SocketAddr) -> IpAddr {
@@ -219,9 +229,9 @@ impl AuthRoute {
         &self.token_type
     }
 
-    //    pub(crate) fn allows_realtime(&self) -> bool {
-    //        self.token_type.allows_realtime()
-    //    }
+    pub(crate) fn allows_realtime(&self) -> bool {
+        self.token_type.allows_realtime()
+    }
 }
 
 impl RedisTarget {
@@ -255,6 +265,18 @@ impl RedisTarget {
             .await?;
 
         Ok(connection.clone())
+    }
+
+    pub(crate) async fn pubsub(&self) -> anyhow::Result<redis::aio::PubSub> {
+        let client = redis::Client::open(self.config.connection_string.as_str())
+            .with_context(|| format!("Invalid Redis URL for target {}", self.config.rrb_id))?;
+
+        client.get_async_pubsub().await.with_context(|| {
+            format!(
+                "Failed to connect realtime subscription for Redis target {}",
+                self.config.rrb_id
+            )
+        })
     }
 
     fn connections_initialized(&self) -> usize {
