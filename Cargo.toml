@@ -1,6 +1,6 @@
 [package]
 name = "rubix-redis-bridge"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["rubixvi"]
 license = "MIT"
 repository = "https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge"

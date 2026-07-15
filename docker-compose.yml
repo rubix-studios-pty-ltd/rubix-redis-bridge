@@ -3,9 +3,9 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "127.0.0.1:7777:8080"
+      - "127.0.0.1:8080:8080"
       # For your Tailscale-only pattern, use this instead:
-      # - "100.118.141.40:7777:8080"
+      # - "100.118.141.40:8080:8080"
     environment:
       RRB_MODE: env
 
