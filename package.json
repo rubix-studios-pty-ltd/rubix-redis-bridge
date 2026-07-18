@@ -67,5 +67,5 @@
     "ioredis": "^5.11.1",
     "undici": "^8.7.0"
   },
-  "packageManager": "pnpm@11.13.1"
+  "packageManager": "pnpm@11.14.0"
 }
