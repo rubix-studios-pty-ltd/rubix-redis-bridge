@@ -1,7 +1,7 @@
 {
   "name": "@rubix-studios-pty-ltd/rubix-redis-bridge",
   "title": "Rubix Redis Bridge",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Secure Rust HTTP bridge for Redis with Upstash Redis, Ratelimit, and Realtime compatibility, scoped command policy, Docker deployment, and SDK tests.",
   "license": "MIT",
   "private": false,

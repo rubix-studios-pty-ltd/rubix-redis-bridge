@@ -1,3 +1,18 @@
+## [1.1.1] - 2026-07-21
+
+### Bug Fixes
+
+- Update test configuration for RRB_TEST_URL and RRB_TOKEN
+- Update docker-compose ports for local and Tailscale configurations
+- Update port configuration in README and CI workflow to use 8080
+
+### Miscellaneous Tasks
+
+- Update dependencies to latest versions and bump schema version in biome.json
+- Update packageManager version to pnpm@11.14.0
+- Update redis, tokio, and tokio-macros dependencies to latest versions
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
 ## [1.1.0] - 2026-07-15
 
 ### Features
