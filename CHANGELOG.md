@@ -1,3 +1,10 @@
+## [1.1.2] - 2026-07-27
+
+### Miscellaneous Tasks
+
+- Remove GitHub Package workflow configuration
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
 ## [1.1.1] - 2026-07-21
 
 ### Bug Fixes
