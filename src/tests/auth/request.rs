@@ -1,9 +1,8 @@
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::IntoResponse;
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::time::Duration;
-
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::IntoResponse;
 
 use crate::app::{ApiError, AppState};
 use crate::client::TrustedProxies;

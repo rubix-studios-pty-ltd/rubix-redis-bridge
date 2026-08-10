@@ -1,9 +1,8 @@
+use redis::Value;
+use redis::aio::ConnectionManager;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-
-use redis::Value;
-use redis::aio::ConnectionManager;
 use tokio::time::timeout;
 use tracing::{error, warn};
 

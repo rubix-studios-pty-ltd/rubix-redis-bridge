@@ -1,5 +1,3 @@
-use std::io::{self, Write};
-
 use axum::body::Body;
 use axum::extract::Json;
 use axum::http::StatusCode;
@@ -7,6 +5,7 @@ use axum::http::header::CONTENT_TYPE;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use serde_json::Value;
+use std::io::{self, Write};
 
 use super::error::ApiError;
 

@@ -1,8 +1,7 @@
-use std::fmt;
-
 use anyhow::{anyhow, bail};
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
+use std::fmt;
 
 const SHA256_DIGEST_BYTES: usize = 32;
 
