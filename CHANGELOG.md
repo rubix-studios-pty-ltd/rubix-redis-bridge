@@ -1,3 +1,13 @@
+## [1.1.3] - 2026-08-10
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.6 and 1.1.0, and bump packageManager to pnpm@11.18.0
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis 1.5.0 and displaydoc 0.2.7
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions, including ioredis 6.0.0 and regex-automata 0.4.18
+- Update dependencies to version 2.5.7 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.0
+- Update pnpm and Docker login action versions in CI and release workflows, and reorder imports in Rust source files
+
 ## [1.1.2] - 2026-07-27
 
 ### Miscellaneous Tasks
