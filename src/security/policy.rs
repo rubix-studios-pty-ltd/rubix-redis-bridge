@@ -1,7 +1,6 @@
+use anyhow::{anyhow, bail};
 use std::collections::HashSet;
 use std::fmt;
-
-use anyhow::{anyhow, bail};
 
 use crate::config::TokenCaps;
 

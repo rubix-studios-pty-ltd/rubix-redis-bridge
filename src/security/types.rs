@@ -1,7 +1,6 @@
-use std::fmt;
-
 use anyhow::bail;
 use serde::Deserialize;
+use std::fmt;
 
 #[derive(Clone)]
 pub struct RedisCommand {

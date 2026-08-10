@@ -1,6 +1,5 @@
-use std::net::IpAddr;
-
 use axum::http::{HeaderMap, HeaderValue};
+use std::net::IpAddr;
 
 use crate::client::forwarded_ip;
 

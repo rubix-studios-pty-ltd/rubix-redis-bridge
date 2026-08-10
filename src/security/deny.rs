@@ -1,7 +1,6 @@
+use anyhow::bail;
 use std::collections::HashSet;
 use std::sync::OnceLock;
-
-use anyhow::bail;
 
 use crate::commands::{DENIED_COMMANDS, RATELIMIT_COMMANDS, REALTIME_COMMANDS};
 

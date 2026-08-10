@@ -1,3 +1,35 @@
+## [1.1.3] - 2026-08-10
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.6 and 1.1.0, and bump packageManager to pnpm@11.18.0
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis 1.5.0 and displaydoc 0.2.7
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions, including ioredis 6.0.0 and regex-automata 0.4.18
+- Update dependencies to version 2.5.7 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.0
+- Update pnpm and Docker login action versions in CI and release workflows, and reorder imports in Rust source files
+
+## [1.1.2] - 2026-07-27
+
+### Miscellaneous Tasks
+
+- Remove GitHub Package workflow configuration
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
+## [1.1.1] - 2026-07-21
+
+### Bug Fixes
+
+- Update test configuration for RRB_TEST_URL and RRB_TOKEN
+- Update docker-compose ports for local and Tailscale configurations
+- Update port configuration in README and CI workflow to use 8080
+
+### Miscellaneous Tasks
+
+- Update dependencies to latest versions and bump schema version in biome.json
+- Update packageManager version to pnpm@11.14.0
+- Update redis, tokio, and tokio-macros dependencies to latest versions
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
 ## [1.1.0] - 2026-07-15
 
 ### Features

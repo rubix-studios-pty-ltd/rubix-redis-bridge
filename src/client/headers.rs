@@ -1,6 +1,5 @@
-use std::net::IpAddr;
-
 use axum::http::HeaderMap;
+use std::net::IpAddr;
 
 use super::parse::parse_ip_candidate;
 

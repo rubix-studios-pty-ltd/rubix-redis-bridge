@@ -7,13 +7,12 @@ mod metrics;
 mod redis;
 mod security;
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-
 use anyhow::Context;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
+use std::net::SocketAddr;
+use std::sync::Arc;
 use tower::limit::ConcurrencyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};

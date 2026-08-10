@@ -1,6 +1,5 @@
-use std::fmt;
-
 use anyhow::bail;
+use std::fmt;
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct TokenCaps {

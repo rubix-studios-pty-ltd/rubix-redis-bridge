@@ -1,7 +1,6 @@
-use std::net::IpAddr;
-
 use anyhow::{anyhow, bail};
 use axum::http::HeaderMap;
+use std::net::IpAddr;
 
 use super::headers::forwarded_ip;
 use super::parse::{prefix_mask_v4, prefix_mask_v6};
