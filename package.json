@@ -60,12 +60,12 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
+    "@biomejs/biome": "2.5.8",
     "@upstash/ratelimit": "latest",
     "@upstash/realtime": "1.1.0",
     "@upstash/redis": "latest",
     "ioredis": "^6.0.0",
     "undici": "^8.10.0"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "pnpm@11.21.0"
 }
