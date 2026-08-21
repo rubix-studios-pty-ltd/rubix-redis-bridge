@@ -1,3 +1,9 @@
+## [1.2.0] - 2026-08-10
+
+### Bug Fixes
+
+- Connection manager stale missing tokio signal for discard and reconnect
+
 ## [1.1.3] - 2026-08-10
 
 ### Miscellaneous Tasks

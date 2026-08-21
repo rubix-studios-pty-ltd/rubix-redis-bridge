@@ -7,13 +7,18 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use tokio::sync::{OnceCell, OwnedSemaphorePermit, Semaphore, SemaphorePermit, TryAcquireError};
+use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore, SemaphorePermit, TryAcquireError};
 
 use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
 use crate::config::{Bridge, Redis, TokenCaps, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
+
+struct ConnectionSlot {
+    generation: u64,
+    connection: Option<ConnectionManager>,
+}
 
 pub struct AppState {
     pub(crate) targets: Vec<Arc<RedisTarget>>,
@@ -34,7 +39,7 @@ pub struct AppState {
 pub(crate) struct RedisTarget {
     pub(crate) config: Redis,
     client: redis::Client,
-    connections: Vec<OnceCell<ConnectionManager>>,
+    connections: Vec<RwLock<ConnectionSlot>>,
     next_connection: AtomicUsize,
     operation_limit: Semaphore,
 }
@@ -112,9 +117,13 @@ impl AppState {
                     format!("Invalid Redis URL for target {}", target_config.rrb_id)
                 })?;
 
-            let connections: Vec<OnceCell<ConnectionManager>> = (0..target_config
-                .connection_shards)
-                .map(|_| OnceCell::new())
+            let connections: Vec<RwLock<ConnectionSlot>> = (0..target_config.connection_shards)
+                .map(|_| {
+                    RwLock::new(ConnectionSlot {
+                        generation: 0,
+                        connection: None,
+                    })
+                })
                 .collect();
 
             let target = Arc::new(RedisTarget {
@@ -251,21 +260,59 @@ impl RedisTarget {
         self.operation_limit.acquire().await
     }
 
-    pub(crate) async fn connection(&self) -> anyhow::Result<ConnectionManager> {
+    pub(crate) async fn connection(&self) -> anyhow::Result<(usize, u64, ConnectionManager)> {
         let shard = self.next_connection.fetch_add(1, Ordering::Relaxed) % self.connections.len();
 
-        let connection = self.connections[shard]
-            .get_or_try_init(|| async {
-                self.client.get_connection_manager().await.with_context(|| {
-                    format!(
-                        "Failed to connect to Redis target {} connection shard {}",
-                        self.config.rrb_id, shard
-                    )
-                })
-            })
-            .await?;
+        {
+            let slot = self.connections[shard].read().await;
 
-        Ok(connection.clone())
+            if let Some(connection) = slot.connection.as_ref() {
+                return Ok((shard, slot.generation, connection.clone()));
+            }
+        }
+
+        let mut slot = self.connections[shard].write().await;
+
+        if let Some(connection) = slot.connection.as_ref() {
+            return Ok((shard, slot.generation, connection.clone()));
+        }
+
+        let connection = self
+            .client
+            .get_connection_manager()
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to connect to Redis target {} connection shard {}",
+                    self.config.rrb_id, shard
+                )
+            })?;
+
+        slot.generation = slot.generation.wrapping_add(1);
+
+        if slot.generation == 0 {
+            slot.generation = 1;
+        }
+
+        let generation = slot.generation;
+        slot.connection = Some(connection.clone());
+
+        Ok((shard, generation, connection))
+    }
+
+    pub(crate) async fn invalidate_connection(&self, shard: usize, generation: u64) -> bool {
+        let Some(connection_slot) = self.connections.get(shard) else {
+            return false;
+        };
+
+        let mut slot = connection_slot.write().await;
+
+        if slot.generation != generation || slot.connection.is_none() {
+            return false;
+        }
+
+        slot.connection = None;
+        true
     }
 
     pub(crate) async fn pubsub(&self) -> anyhow::Result<redis::aio::PubSub> {
@@ -280,7 +327,11 @@ impl RedisTarget {
     fn connections_initialized(&self) -> usize {
         self.connections
             .iter()
-            .filter(|connection| connection.get().is_some())
+            .filter(|slot| {
+                slot.try_read()
+                    .map(|guard| guard.connection.is_some())
+                    .unwrap_or(false)
+            })
             .count()
     }
 }

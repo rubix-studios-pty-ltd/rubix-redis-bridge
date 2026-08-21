@@ -1,7 +1,7 @@
 {
   "name": "@rubix-studios-pty-ltd/rubix-redis-bridge",
   "title": "Rubix Redis Bridge",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "description": "Secure Rust HTTP bridge for Redis with Upstash Redis, Ratelimit, and Realtime compatibility, scoped command policy, Docker deployment, and SDK tests.",
   "license": "MIT",
   "private": false,
@@ -60,12 +60,12 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
+    "@biomejs/biome": "2.5.9",
     "@upstash/ratelimit": "latest",
     "@upstash/realtime": "1.1.0",
     "@upstash/redis": "latest",
     "ioredis": "^6.0.0",
     "undici": "^8.10.0"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "pnpm@11.22.0"
 }
