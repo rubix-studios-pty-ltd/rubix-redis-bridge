@@ -4,6 +4,7 @@ mod client;
 mod commands;
 mod config;
 mod metrics;
+mod pendo;
 mod redis;
 mod security;
 
@@ -25,6 +26,8 @@ use crate::config::Bridge;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
+
+    pendo::init();
 
     let config = Bridge::from_env().context("Failed to load bridge configuration")?;
     let bind: SocketAddr = format!("{}:{}", config.host, config.port)

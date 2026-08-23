@@ -10,14 +10,41 @@ use super::lockout::AuthFailure;
 
 impl AppState {
     pub(crate) fn unauthorized(&self, ip: IpAddr, message: impl Into<String>) -> ApiError {
+        let message = message.into();
         self.metrics.auth_failed();
 
         let result = self.auth_lockout.record_failure(ip);
+
+        let lockout_status = match result {
+            AuthFailure::Locked => "locked",
+            AuthFailure::AlreadyLocked => "already_locked",
+            AuthFailure::EntryLimitReached => "entry_limit_reached",
+            AuthFailure::Tracked => "tracked",
+            AuthFailure::Disabled => "disabled",
+        };
+
+        crate::pendo::track(
+            "authentication_failed",
+            "system",
+            serde_json::json!({
+                "failure_type": &message,
+                "lockout_status": lockout_status,
+            }),
+        );
 
         match result {
             AuthFailure::Locked => {
                 self.metrics.lockout_created();
                 self.refresh_lockout_metrics();
+                crate::pendo::track(
+                    "auth_lockout_triggered",
+                    "system",
+                    serde_json::json!({
+                        "failure_count": self.auth_lockout.max_failures(),
+                        "lockout_window_seconds": self.auth_lockout.failure_window_secs(),
+                        "lockout_duration_seconds": self.auth_lockout.lockout_duration_secs(),
+                    }),
+                );
                 ApiError::too_many_requests("Too many failed authentication attempts")
             }
             AuthFailure::AlreadyLocked => {

@@ -181,6 +181,15 @@ where
         }
         Ok(Err(error)) => {
             operation_metrics.error();
+            crate::pendo::track(
+                "redis_operation_failed",
+                &target_id,
+                serde_json::json!({
+                    "target_id": &target_id,
+                    "operation_type": operation_name,
+                    "error_status": "error",
+                }),
+            );
             Err(error)
         }
         Err(_) => {
@@ -194,11 +203,13 @@ where
             );
 
             let shard = used_shard.load(Ordering::Acquire);
+            let mut connection_invalidated = false;
 
             if shard != usize::MAX {
                 let generation = used_generation.load(Ordering::Relaxed);
 
                 if target.invalidate_connection(shard, generation).await {
+                    connection_invalidated = true;
                     warn!(
                         target = %target_id,
                         shard,
@@ -207,6 +218,17 @@ where
                     );
                 }
             }
+
+            let mut properties = serde_json::json!({
+                "target_id": &target_id,
+                "operation_type": operation_name,
+                "timeout_ms": request_timeout.as_millis() as u64,
+                "connection_invalidated": connection_invalidated,
+            });
+            if shard != usize::MAX {
+                properties["connection_shard"] = serde_json::json!(shard);
+            }
+            crate::pendo::track("redis_operation_timeout", &target_id, properties);
 
             Err(ApiError::timeout(timeout_message))
         }

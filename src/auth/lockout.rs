@@ -81,6 +81,18 @@ impl AuthLockout {
         self.max_failures > 0
     }
 
+    pub(crate) fn max_failures(&self) -> usize {
+        self.max_failures
+    }
+
+    pub(crate) fn failure_window_secs(&self) -> u64 {
+        self.failure_window.as_secs()
+    }
+
+    pub(crate) fn lockout_duration_secs(&self) -> u64 {
+        self.lockout_duration.as_secs()
+    }
+
     pub(crate) fn record_failure(&self, ip: IpAddr) -> AuthFailure {
         self.record_failure_at(ip, Instant::now())
     }
