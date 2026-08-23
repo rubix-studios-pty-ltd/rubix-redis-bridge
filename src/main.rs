@@ -4,6 +4,7 @@ mod client;
 mod commands;
 mod config;
 mod metrics;
+mod pendo;
 mod redis;
 mod security;
 

@@ -18,6 +18,16 @@ impl AppState {
             AuthFailure::Locked => {
                 self.metrics.lockout_created();
                 self.refresh_lockout_metrics();
+                crate::pendo::track(
+                    "authentication_lockout_triggered",
+                    "system",
+                    "system",
+                    serde_json::json!({
+                        "failure_count": self.auth_lockout.max_failures(),
+                        "failure_window_seconds": self.auth_lockout.failure_window().as_secs(),
+                        "lockout_duration_seconds": self.auth_lockout.lockout_duration().as_secs(),
+                    }),
+                );
                 ApiError::too_many_requests("Too many failed authentication attempts")
             }
             AuthFailure::AlreadyLocked => {

@@ -181,6 +181,16 @@ where
         }
         Ok(Err(error)) => {
             operation_metrics.error();
+            crate::pendo::track(
+                "command_execution_failed",
+                "system",
+                &target_id,
+                serde_json::json!({
+                    "target_id": &target_id,
+                    "operation_type": operation_name,
+                    "error_type": "redis_error",
+                }),
+            );
             Err(error)
         }
         Err(_) => {
@@ -194,11 +204,13 @@ where
             );
 
             let shard = used_shard.load(Ordering::Acquire);
+            let mut shard_invalidated = false;
 
             if shard != usize::MAX {
                 let generation = used_generation.load(Ordering::Relaxed);
 
                 if target.invalidate_connection(shard, generation).await {
+                    shard_invalidated = true;
                     warn!(
                         target = %target_id,
                         shard,
@@ -207,6 +219,18 @@ where
                     );
                 }
             }
+
+            crate::pendo::track(
+                "command_execution_timeout",
+                "system",
+                &target_id,
+                serde_json::json!({
+                    "target_id": &target_id,
+                    "operation_type": operation_name,
+                    "timeout_ms": request_timeout.as_millis() as u64,
+                    "connection_shard_invalidated": shard_invalidated,
+                }),
+            );
 
             Err(ApiError::timeout(timeout_message))
         }

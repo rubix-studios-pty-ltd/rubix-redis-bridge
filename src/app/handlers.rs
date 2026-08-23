@@ -119,13 +119,26 @@ pub async fn command(
     {
         Ok(command) => command,
         Err(error) => {
+            let denial_reason = error.to_string();
             state
                 .metrics()
                 .command_denied(route.target().id(), "single");
             state.metrics().request_denied("command", "policy");
-            return ApiError::bad_request(error.to_string()).into_response();
+            crate::pendo::track(
+                "command_denied_by_policy",
+                "system",
+                route.target().id(),
+                serde_json::json!({
+                    "target_id": route.target().id(),
+                    "operation_type": "single",
+                    "denial_reason": &denial_reason,
+                }),
+            );
+            return ApiError::bad_request(denial_reason).into_response();
         }
     };
+
+    let command_name = command.name.clone();
 
     match execute_command(
         route.target(),
@@ -136,18 +149,32 @@ pub async fn command(
     )
     .await
     {
-        Ok(value) => response_or_denied(
-            &state,
-            "command",
-            serialized_response(
-                StatusCode::OK,
-                &CommandResponse {
-                    result: &value,
-                    base64_encoding,
-                },
-                state.max_response_bytes(),
-            ),
-        ),
+        Ok(value) => {
+            let target = route.target();
+            crate::pendo::track(
+                "command_executed",
+                "system",
+                target.id(),
+                serde_json::json!({
+                    "target_id": target.id(),
+                    "command_name": &command_name,
+                    "base64_encoding": base64_encoding,
+                    "operation_type": "command",
+                }),
+            );
+            response_or_denied(
+                &state,
+                "command",
+                serialized_response(
+                    StatusCode::OK,
+                    &CommandResponse {
+                        result: &value,
+                        base64_encoding,
+                    },
+                    state.max_response_bytes(),
+                ),
+            )
+        }
         Err(error) => error.into_response(),
     }
 }
@@ -183,13 +210,26 @@ pub async fn pipeline(
     {
         Ok(commands) => commands,
         Err(error) => {
+            let denial_reason = error.to_string();
             state
                 .metrics()
                 .command_denied(route.target().id(), "pipeline");
             state.metrics().request_denied("pipeline", "policy");
-            return ApiError::bad_request(error.to_string()).into_response();
+            crate::pendo::track(
+                "command_denied_by_policy",
+                "system",
+                route.target().id(),
+                serde_json::json!({
+                    "target_id": route.target().id(),
+                    "operation_type": "pipeline",
+                    "denial_reason": &denial_reason,
+                }),
+            );
+            return ApiError::bad_request(denial_reason).into_response();
         }
     };
+
+    let command_count = commands.len();
 
     match execute_pipeline(
         route.target(),
@@ -200,18 +240,32 @@ pub async fn pipeline(
     )
     .await
     {
-        Ok(response_items) => response_or_denied(
-            &state,
-            "pipeline",
-            serialized_response(
-                StatusCode::OK,
-                &PipelineResponse {
-                    items: &response_items,
-                    base64_encoding,
-                },
-                state.max_response_bytes(),
-            ),
-        ),
+        Ok(response_items) => {
+            let target = route.target();
+            crate::pendo::track(
+                "pipeline_executed",
+                "system",
+                target.id(),
+                serde_json::json!({
+                    "target_id": target.id(),
+                    "command_count": command_count,
+                    "base64_encoding": base64_encoding,
+                    "operation_type": "pipeline",
+                }),
+            );
+            response_or_denied(
+                &state,
+                "pipeline",
+                serialized_response(
+                    StatusCode::OK,
+                    &PipelineResponse {
+                        items: &response_items,
+                        base64_encoding,
+                    },
+                    state.max_response_bytes(),
+                ),
+            )
+        }
         Err(error) => error.into_response(),
     }
 }
@@ -247,13 +301,26 @@ pub async fn multi_exec(
     {
         Ok(commands) => commands,
         Err(error) => {
+            let denial_reason = error.to_string();
             state
                 .metrics()
                 .command_denied(route.target().id(), "multi_exec");
             state.metrics().request_denied("multi_exec", "policy");
-            return ApiError::bad_request(error.to_string()).into_response();
+            crate::pendo::track(
+                "command_denied_by_policy",
+                "system",
+                route.target().id(),
+                serde_json::json!({
+                    "target_id": route.target().id(),
+                    "operation_type": "multi_exec",
+                    "denial_reason": &denial_reason,
+                }),
+            );
+            return ApiError::bad_request(denial_reason).into_response();
         }
     };
+
+    let command_count = commands.len();
 
     match execute_transaction(
         route.target(),
@@ -264,18 +331,32 @@ pub async fn multi_exec(
     )
     .await
     {
-        Ok(values) => response_or_denied(
-            &state,
-            "multi_exec",
-            serialized_response(
-                StatusCode::OK,
-                &TransactionResponse {
-                    values: &values,
-                    base64_encoding,
-                },
-                state.max_response_bytes(),
-            ),
-        ),
+        Ok(values) => {
+            let target = route.target();
+            crate::pendo::track(
+                "transaction_executed",
+                "system",
+                target.id(),
+                serde_json::json!({
+                    "target_id": target.id(),
+                    "command_count": command_count,
+                    "base64_encoding": base64_encoding,
+                    "operation_type": "multi_exec",
+                }),
+            );
+            response_or_denied(
+                &state,
+                "multi_exec",
+                serialized_response(
+                    StatusCode::OK,
+                    &TransactionResponse {
+                        values: &values,
+                        base64_encoding,
+                    },
+                    state.max_response_bytes(),
+                ),
+            )
+        }
         Err(error) => error.into_response(),
     }
 }

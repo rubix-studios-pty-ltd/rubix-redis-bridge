@@ -32,6 +32,15 @@ pub async fn subscribe(
         Ok(route) => route,
         Err(error) => {
             state.metrics().request_denied("subscribe", "auth");
+            crate::pendo::track(
+                "realtime_subscription_denied",
+                "system",
+                "system",
+                serde_json::json!({
+                    "denial_reason": "auth",
+                    "channel": &channel,
+                }),
+            );
             return error.into_response();
         }
     };
@@ -40,18 +49,48 @@ pub async fn subscribe(
         Ok(body) => body,
         Err(_) => {
             state.metrics().request_denied("subscribe", "invalid_json");
+            crate::pendo::track(
+                "realtime_subscription_denied",
+                "system",
+                route.target().id(),
+                serde_json::json!({
+                    "denial_reason": "invalid_json",
+                    "target_id": route.target().id(),
+                    "channel": &channel,
+                }),
+            );
             return ApiError::bad_request("Invalid JSON body").into_response();
         }
     };
 
     if !body.is_empty() {
         state.metrics().request_denied("subscribe", "invalid_body");
+        crate::pendo::track(
+            "realtime_subscription_denied",
+            "system",
+            route.target().id(),
+            serde_json::json!({
+                "denial_reason": "invalid_body",
+                "target_id": route.target().id(),
+                "channel": &channel,
+            }),
+        );
         return ApiError::bad_request("Subscription body must be an empty command array")
             .into_response();
     }
 
     if let Err(error) = validate_channel(&channel, state.security().max_arg_bytes) {
         state.metrics().request_denied("subscribe", "channel");
+        crate::pendo::track(
+            "realtime_subscription_denied",
+            "system",
+            route.target().id(),
+            serde_json::json!({
+                "denial_reason": "invalid_channel",
+                "target_id": route.target().id(),
+                "channel": &channel,
+            }),
+        );
         return error.into_response();
     }
 
@@ -60,6 +99,16 @@ pub async fn subscribe(
         Err(error) => {
             warn!(%error, "Realtime connection limiter saturated");
             state.metrics().request_denied("subscribe", "capacity");
+            crate::pendo::track(
+                "realtime_subscription_denied",
+                "system",
+                route.target().id(),
+                serde_json::json!({
+                    "denial_reason": "capacity",
+                    "target_id": route.target().id(),
+                    "channel": &channel,
+                }),
+            );
             return ApiError::too_many_requests("Realtime connection capacity exhausted")
                 .into_response();
         }
@@ -82,6 +131,16 @@ pub async fn subscribe(
         Ok(Err(error)) => {
             error!(%error, target = %target_id, "Redis realtime subscription failed");
             state.metrics().request_denied("subscribe", "backend");
+            crate::pendo::track(
+                "realtime_subscription_denied",
+                "system",
+                &target_id,
+                serde_json::json!({
+                    "denial_reason": "backend",
+                    "target_id": &target_id,
+                    "channel": &channel,
+                }),
+            );
             return ApiError::unavailable("Redis backend unavailable").into_response();
         }
         Err(_) => {
@@ -91,6 +150,16 @@ pub async fn subscribe(
                 "Redis realtime subscription setup timed out"
             );
             state.metrics().request_denied("subscribe", "timeout");
+            crate::pendo::track(
+                "realtime_subscription_denied",
+                "system",
+                &target_id,
+                serde_json::json!({
+                    "denial_reason": "timeout",
+                    "target_id": &target_id,
+                    "channel": &channel,
+                }),
+            );
             return ApiError::timeout("Redis subscription setup timed out").into_response();
         }
     };
@@ -98,6 +167,17 @@ pub async fn subscribe(
     let connection_guard = state.metrics().realtime_connection(target_id.clone());
     let subscribed = format!("subscribe,{channel},1");
     let (sink, messages) = pubsub.split();
+
+    crate::pendo::track(
+        "realtime_subscription_established",
+        "system",
+        &target_id,
+        serde_json::json!({
+            "target_id": &target_id,
+            "channel": &channel,
+        }),
+    );
+
     let initial =
         stream::once(async move { Ok::<Event, Infallible>(Event::default().data(subscribed)) });
     let messages = stream::unfold(
