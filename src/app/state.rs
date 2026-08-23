@@ -13,6 +13,7 @@ use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
 use crate::config::{Bridge, Redis, TokenCaps, TokenHash};
 use crate::metrics::Metrics;
+use crate::pendo::PendoTracker;
 use crate::security::SecurityPolicy;
 
 struct ConnectionSlot {
@@ -33,6 +34,7 @@ pub struct AppState {
     pub(crate) auth_lockout: AuthLockout,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) trusted_proxies: TrustedProxies,
+    pub(crate) pendo: Option<PendoTracker>,
     realtime_limit: Arc<Semaphore>,
 }
 
@@ -174,6 +176,7 @@ impl AppState {
             ),
             trust_proxy_headers: config.trust_proxy_headers,
             trusted_proxies: config.trusted_proxies,
+            pendo: PendoTracker::from_env(),
             realtime_limit: Arc::new(Semaphore::new(config.max_realtime_concurrency)),
         })
     }
@@ -204,6 +207,10 @@ impl AppState {
 
     pub(crate) fn security(&self) -> &SecurityPolicy {
         &self.security
+    }
+
+    pub(crate) fn pendo(&self) -> Option<&PendoTracker> {
+        self.pendo.as_ref()
     }
 
     pub(crate) fn acquire_realtime(&self) -> Result<OwnedSemaphorePermit, TryAcquireError> {

@@ -119,10 +119,22 @@ pub async fn command(
     {
         Ok(command) => command,
         Err(error) => {
-            state
-                .metrics()
-                .command_denied(route.target().id(), "single");
+            let target_id = route.target().id().to_owned();
+            state.metrics().command_denied(&target_id, "single");
             state.metrics().request_denied("command", "policy");
+
+            if let Some(pendo) = state.pendo() {
+                pendo.track(
+                    "Command Policy Denied",
+                    "system",
+                    &target_id,
+                    json!({
+                        "route": "command",
+                        "target_id": target_id,
+                    }),
+                );
+            }
+
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -183,10 +195,22 @@ pub async fn pipeline(
     {
         Ok(commands) => commands,
         Err(error) => {
-            state
-                .metrics()
-                .command_denied(route.target().id(), "pipeline");
+            let target_id = route.target().id().to_owned();
+            state.metrics().command_denied(&target_id, "pipeline");
             state.metrics().request_denied("pipeline", "policy");
+
+            if let Some(pendo) = state.pendo() {
+                pendo.track(
+                    "Command Policy Denied",
+                    "system",
+                    &target_id,
+                    json!({
+                        "route": "pipeline",
+                        "target_id": target_id,
+                    }),
+                );
+            }
+
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };
@@ -247,10 +271,22 @@ pub async fn multi_exec(
     {
         Ok(commands) => commands,
         Err(error) => {
-            state
-                .metrics()
-                .command_denied(route.target().id(), "multi_exec");
+            let target_id = route.target().id().to_owned();
+            state.metrics().command_denied(&target_id, "multi_exec");
             state.metrics().request_denied("multi_exec", "policy");
+
+            if let Some(pendo) = state.pendo() {
+                pendo.track(
+                    "Command Policy Denied",
+                    "system",
+                    &target_id,
+                    json!({
+                        "route": "multi_exec",
+                        "target_id": target_id,
+                    }),
+                );
+            }
+
             return ApiError::bad_request(error.to_string()).into_response();
         }
     };

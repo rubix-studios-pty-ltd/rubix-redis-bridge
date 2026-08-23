@@ -6,6 +6,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use futures_util::StreamExt;
 use futures_util::stream;
+use serde_json::json;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -96,6 +97,18 @@ pub async fn subscribe(
     };
 
     let connection_guard = state.metrics().realtime_connection(target_id.clone());
+
+    if let Some(pendo) = state.pendo() {
+        pendo.track(
+            "Realtime Subscription Started",
+            "system",
+            &target_id,
+            json!({
+                "target_id": target_id,
+            }),
+        );
+    }
+
     let subscribed = format!("subscribe,{channel},1");
     let (sink, messages) = pubsub.split();
     let initial =

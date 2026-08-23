@@ -1,4 +1,5 @@
 use axum::http::HeaderMap;
+use serde_json::json;
 use std::net::IpAddr;
 use subtle::ConstantTimeEq;
 
@@ -18,6 +19,18 @@ impl AppState {
             AuthFailure::Locked => {
                 self.metrics.lockout_created();
                 self.refresh_lockout_metrics();
+
+                if let Some(pendo) = self.pendo() {
+                    pendo.track(
+                        "Auth Lockout Created",
+                        &ip.to_string(),
+                        "system",
+                        json!({
+                            "client_ip": ip.to_string(),
+                        }),
+                    );
+                }
+
                 ApiError::too_many_requests("Too many failed authentication attempts")
             }
             AuthFailure::AlreadyLocked => {
