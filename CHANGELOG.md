@@ -1,3 +1,21 @@
+## [1.2.1] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.8 in biome.json, package.json, and pnpm-lock.yaml, and bump packageManager to pnpm@11.21.0
+- Update dependencies to version 2.5.9 in biome.json, package.json, and pnpm-lock.yaml, and bump redis to 1.6.0 in Cargo.toml and Cargo.lock
+- Update rust-cache action version to 2.9.2 in CI and release workflows
+- Update dependencies to version 2.5.10 in biome.json, package.json, and pnpm-lock.yaml, and bump log and rustls-webpki versions in Cargo.lock
+- Update Docker Buildx action version to 4.3.0 in CI and release workflows
+- Update dependencies in Cargo.lock and package.json to latest versions
+- Update dependencies to version 2.5.11 in biome.json, package.json, and pnpm-lock.yaml, and bump @upstash/redis to 1.38.3
+- Update dependencies in Cargo.lock to latest versions (cpufeatures 0.3.1, hyper 1.11.1, tower-http 0.7.1)
+- Update packageManager to pnpm@11.25.0 in package.json
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis to 1.7.0 and syn to 3.0.5; update packageManager to pnpm@12.3.4 in package.json
+- Update dependencies in Cargo.lock to latest versions (bitflags 2.13.2, cc 1.4.6, rustls 0.23.45, smallvec 1.16.1) and update packageManager to pnpm@12.4.1 in package.json
+- Update dependencies to version 2.5.13 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.2
+- Update pnpm action version to 6.1.0 and docker/setup-qemu-action version to 4.3.0 in CI and release workflows
+
 ## [1.2.0] - 2026-08-10
 
 ### Bug Fixes
