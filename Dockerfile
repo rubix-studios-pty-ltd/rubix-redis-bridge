@@ -8,7 +8,10 @@ RUN cargo build --release --locked
 FROM debian:trixie-slim
 
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin app
 
