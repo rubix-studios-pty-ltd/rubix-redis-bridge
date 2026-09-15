@@ -1,3 +1,9 @@
+## [1.2.2] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Enhance Dockerfile by adding apt-get upgrade, autoremove, and clean commands to optimize image size
+
 ## [1.2.1] - 2026-09-15
 
 ### Miscellaneous Tasks
