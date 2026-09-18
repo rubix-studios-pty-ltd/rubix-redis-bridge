@@ -156,7 +156,7 @@ jobs:
         uses: docker/setup-buildx-action@v4.3.0
 
       - name: Build local image for scan
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           push: false
@@ -256,7 +256,7 @@ jobs:
 
       - name: Build and push image with SBOM and provenance
         id: build
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           push: true
