@@ -171,13 +171,13 @@ importers:
         version: 2.5.14
       '@upstash/ratelimit':
         specifier: latest
-        version: 2.1.0(@upstash/redis@1.38.4)
+        version: 2.2.0(@upstash/redis@1.39.0)
       '@upstash/realtime':
         specifier: 1.1.0
-        version: 1.1.0(@upstash/redis@1.38.4)(zod@4.6.5)
+        version: 1.1.0(@upstash/redis@1.39.0)(zod@4.6.5)
       '@upstash/redis':
         specifier: latest
-        version: 1.38.4
+        version: 1.39.0
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
@@ -251,8 +251,8 @@ packages:
     resolution: {integrity: sha512-7qJHGxpQgQr9/vmeS1PktEwvNAF7TI4iJDi8Pu2CFZ9YUGHZH4fOP5TfYlZ4aVxfopnELiE4BS4FBjyK7V1/xQ==}
     engines: {node: '>=16.0.0'}
 
-  '@upstash/ratelimit@2.1.0':
-    resolution: {integrity: sha512-a0bpet6HkEfLaTldcBgIgUCe7ELfnpudrruNDye/W1Oknz+ekB9PthUbqFSWRNZnV0y/EbK8YXYfhLG5KU8DYw==}
+  '@upstash/ratelimit@2.2.0':
+    resolution: {integrity: sha512-gSydXspG6TJKTh71/gGGv4IGDjD9rXglQfm2jAue2kh4bcfWtEAsG1NW4OqzZd/hubJPojsbOU6AMdS6Xqh0tQ==}
     peerDependencies:
       '@upstash/redis': ^1.38.2
 
@@ -269,8 +269,8 @@ packages:
       react-dom:
         optional: true
 
-  '@upstash/redis@1.38.4':
-    resolution: {integrity: sha512-ZX69mKReun/yieyHYLoBg0eSiF6hjCQjd8zUKkJ5eCHehDV6P8S8oZOHxGSfkH1spfOhGZk0EGerBrfUsXow8g==}
+  '@upstash/redis@1.39.0':
+    resolution: {integrity: sha512-VwkpYTdxSfjSulQS5h16NHtg/1UEheBfvez2AeGKinAujOoGXhXCcohQRzsQ/d2g/XzbjzTVGhG8Ds8uOI0Mxg==}
 
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
@@ -354,19 +354,19 @@ snapshots:
 
   '@upstash/core-analytics@0.0.10':
     dependencies:
-      '@upstash/redis': 1.38.4
+      '@upstash/redis': 1.39.0
 
-  '@upstash/ratelimit@2.1.0(@upstash/redis@1.38.4)':
+  '@upstash/ratelimit@2.2.0(@upstash/redis@1.39.0)':
     dependencies:
       '@upstash/core-analytics': 0.0.10
-      '@upstash/redis': 1.38.4
+      '@upstash/redis': 1.39.0
 
-  '@upstash/realtime@1.1.0(@upstash/redis@1.38.4)(zod@4.6.5)':
+  '@upstash/realtime@1.1.0(@upstash/redis@1.39.0)(zod@4.6.5)':
     dependencies:
-      '@upstash/redis': 1.38.4
+      '@upstash/redis': 1.39.0
       zod: 4.6.5
 
-  '@upstash/redis@1.38.4':
+  '@upstash/redis@1.39.0':
     dependencies:
       uncrypto: 0.1.3
 
