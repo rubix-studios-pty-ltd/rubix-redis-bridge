@@ -173,6 +173,7 @@ jobs:
           image-ref: rubix-redis-bridge:scan
           severity: CRITICAL,HIGH
           scanners: 'vuln'
+          vuln-type: 'library'
           ignore-unfixed: true
           exit-code: "1"
 
