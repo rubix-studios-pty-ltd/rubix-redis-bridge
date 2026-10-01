@@ -1,3 +1,19 @@
+## [1.2.3] - 2026-10-01
+
+### Bug Fixes
+
+- Redis connection management by adding custom configuration options for timeout and retry settings
+
+### Miscellaneous Tasks
+
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (cc 1.4.7, cfg-if 1.0.5, find-msvc-tools 0.1.13, syn 3.0.6, unicode-ident 1.0.26, yoke-derive 0.8.3, zerofrom-derive 0.1.8, and @biomejs/biome 2.5.14)
+- Update packageManager to pnpm@12.5.1 and bump biome schema version to 2.5.14 in biome.json, package.json, and pnpm-lock.yaml
+- Update Docker actions to latest versions in CI and release workflows, upgrading setup-buildx to v4.4.0 and build-push-action to v7.4.0
+- Upgrade setup-buildx-action to v4.4.1 in CI and release workflows
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions (cc 1.5.1, find-msvc-tools 0.1.14, hyper-util 0.1.21, redis 1.7.1, smallvec 1.16.2, thiserror 2.0.21)
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (tokio-rustls 0.26.6, xxhash-rust 0.8.19, yoke-derive 0.8.4, undici 8.11.2, and pnpm to 12.8.1)
+- Update base64 dependency to version 0.23.1 and rust-version to 1.98.1 in Cargo.toml and Cargo.lock
+
 ## [1.2.2] - 2026-09-15
 
 ### Miscellaneous Tasks
