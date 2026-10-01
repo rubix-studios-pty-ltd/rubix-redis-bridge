@@ -22,6 +22,7 @@ permissions:
 
 env:
   IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE }}
+  GHCR_IMAGE: ghcr.io/rubix-studios-pty-ltd/rubix-redis-bridge
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
@@ -186,6 +187,7 @@ jobs:
 
     permissions:
       contents: read
+      packages: write
       id-token: write
 
     outputs:
