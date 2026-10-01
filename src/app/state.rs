@@ -1,6 +1,6 @@
 use anyhow::Context;
 use axum::http::HeaderMap;
-use redis::aio::ConnectionManager;
+use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use std::collections::HashMap;
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
@@ -277,9 +277,15 @@ impl RedisTarget {
             return Ok((shard, slot.generation, connection.clone()));
         }
 
+        let config = ConnectionManagerConfig::new()
+            .set_connection_timeout(Some(Duration::from_secs(1)))
+            .set_number_of_retries(2)
+            .set_min_delay(Duration::from_millis(100))
+            .set_max_delay(Duration::from_millis(250));
+
         let connection = self
             .client
-            .get_connection_manager()
+            .get_connection_manager_with_config(config)
             .await
             .with_context(|| {
                 format!(
