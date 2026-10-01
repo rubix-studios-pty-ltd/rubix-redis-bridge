@@ -5,13 +5,13 @@ authors = ["rubixvi"]
 license = "MIT"
 repository = "https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.98.1"
 publish = false
 
 [dependencies]
 anyhow = "1"
 axum = { version = "0.8", features = ["json", "tokio"] }
-base64 = "0.22"
+base64 = "0.23.1"
 futures-util = "0.3"
 hex = "0.4"
 hmac = "0.13"
