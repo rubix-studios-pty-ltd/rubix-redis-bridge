@@ -5,10 +5,6 @@
 - Redis connection management by adding custom configuration options for timeout and retry settings
 - Release workflow by adding GitHub release creation step and updating permissions for package and id-token access
 - Enhance npm version command in release prep script to allow same version and handle errors
-- Update release workflow to include vulnerability and secret scanning, and skip .env files
-- Update release workflow to skip additional .env files during vulnerability and secret scanning
-- Update release workflow to remove secret scanning and adjust vulnerability scanning settings
-- Add 'vuln-type' parameter to vulnerability scanning in release workflow
 
 ### Miscellaneous Tasks
 
@@ -19,14 +15,6 @@
 - Update dependencies in Cargo.lock and Cargo.toml to latest versions (cc 1.5.1, find-msvc-tools 0.1.14, hyper-util 0.1.21, redis 1.7.1, smallvec 1.16.2, thiserror 2.0.21)
 - Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (tokio-rustls 0.26.6, xxhash-rust 0.8.19, yoke-derive 0.8.4, undici 8.11.2, and pnpm to 12.8.1)
 - Update base64 dependency to version 0.23.1 and rust-version to 1.98.1 in Cargo.toml and Cargo.lock
-- Release 1.2.3
-- Release 1.2.3
-- Remove outdated entries from CHANGELOG.md
-- Release 1.2.3
-- Clean up CHANGELOG.md by removing outdated entries and summarizing previous updates
-- Release 1.2.3
-- Update release workflow to include GHCR image and adjust permissions
-- Clean up CHANGELOG.md by removing outdated version 1.2.3 entries
 
 ## [1.2.2] - 2026-09-15
 
