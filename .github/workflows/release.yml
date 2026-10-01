@@ -17,6 +17,8 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 env:
   IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE }}
@@ -239,6 +241,13 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Log in to GitHub
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -274,14 +283,41 @@ jobs:
       - name: Check Cosign
         run: cosign version
 
-      - name: Sign Docker image digest
+      - name: Sign Docker image digests
         env:
           COSIGN_YES: "true"
-          IMAGE_REF: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          DOCKERHUB_IMAGE: ${{ env.IMAGE_NAME }}
+          GHCR_IMAGE: ${{ env.GHCR_IMAGE }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          if [ -z "${{ steps.build.outputs.digest }}" ]; then
+          if [ -z "$IMAGE_DIGEST" ]; then
             echo "Docker build digest is missing"
             exit 1
           fi
 
-          cosign sign "$IMAGE_REF"
+          cosign sign "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
+          cosign sign "$GHCR_IMAGE@$IMAGE_DIGEST"
+
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    needs: docker
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.docker.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists"
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi
