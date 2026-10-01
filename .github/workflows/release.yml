@@ -256,7 +256,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE }}
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.semver }}
@@ -294,12 +296,29 @@ jobs:
           GHCR_IMAGE: ${{ env.GHCR_IMAGE }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          set -euo pipefail
+
           if [ -z "$IMAGE_DIGEST" ]; then
             echo "Docker build digest is missing"
             exit 1
           fi
 
+          if [ -z "$DOCKERHUB_IMAGE" ]; then
+            echo "Docker Hub image name is missing"
+            exit 1
+          fi
+
+          if [ -z "$GHCR_IMAGE" ]; then
+            echo "GHCR image name is missing"
+            exit 1
+          fi
+
+          echo "Signing Docker Hub image:"
+          echo "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
           cosign sign "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
+
+          echo "Signing GHCR image:"
+          echo "$GHCR_IMAGE@$IMAGE_DIGEST"
           cosign sign "$GHCR_IMAGE@$IMAGE_DIGEST"
 
   github-release:
