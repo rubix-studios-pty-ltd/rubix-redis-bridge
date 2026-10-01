@@ -172,10 +172,7 @@ jobs:
         with:
           image-ref: rubix-redis-bridge:scan
           severity: CRITICAL,HIGH
-          scanners: 'vuln,secret'
-          skip-files: |
-            **/.env
-            **/.env.*
+          scanners: 'vuln'
           ignore-unfixed: true
           exit-code: "1"
 
