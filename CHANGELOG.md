@@ -1,3 +1,61 @@
+## [1.2.3] - 2026-10-01
+
+### Bug Fixes
+
+- Redis connection management by adding custom configuration options for timeout and retry settings
+- Release workflow by adding GitHub release creation step and updating permissions for package and id-token access
+- Enhance npm version command in release prep script to allow same version and handle errors
+
+### Miscellaneous Tasks
+
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (cc 1.4.7, cfg-if 1.0.5, find-msvc-tools 0.1.13, syn 3.0.6, unicode-ident 1.0.26, yoke-derive 0.8.3, zerofrom-derive 0.1.8, and @biomejs/biome 2.5.14)
+- Update packageManager to pnpm@12.5.1 and bump biome schema version to 2.5.14 in biome.json, package.json, and pnpm-lock.yaml
+- Update Docker actions to latest versions in CI and release workflows, upgrading setup-buildx to v4.4.0 and build-push-action to v7.4.0
+- Upgrade setup-buildx-action to v4.4.1 in CI and release workflows
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions (cc 1.5.1, find-msvc-tools 0.1.14, hyper-util 0.1.21, redis 1.7.1, smallvec 1.16.2, thiserror 2.0.21)
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (tokio-rustls 0.26.6, xxhash-rust 0.8.19, yoke-derive 0.8.4, undici 8.11.2, and pnpm to 12.8.1)
+- Update base64 dependency to version 0.23.1 and rust-version to 1.98.1 in Cargo.toml and Cargo.lock
+
+## [1.2.2] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Enhance Dockerfile by adding apt-get upgrade, autoremove, and clean commands to optimize image size
+
+## [1.2.1] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.8 in biome.json, package.json, and pnpm-lock.yaml, and bump packageManager to pnpm@11.21.0
+- Update dependencies to version 2.5.9 in biome.json, package.json, and pnpm-lock.yaml, and bump redis to 1.6.0 in Cargo.toml and Cargo.lock
+- Update rust-cache action version to 2.9.2 in CI and release workflows
+- Update dependencies to version 2.5.10 in biome.json, package.json, and pnpm-lock.yaml, and bump log and rustls-webpki versions in Cargo.lock
+- Update Docker Buildx action version to 4.3.0 in CI and release workflows
+- Update dependencies in Cargo.lock and package.json to latest versions
+- Update dependencies to version 2.5.11 in biome.json, package.json, and pnpm-lock.yaml, and bump @upstash/redis to 1.38.3
+- Update dependencies in Cargo.lock to latest versions (cpufeatures 0.3.1, hyper 1.11.1, tower-http 0.7.1)
+- Update packageManager to pnpm@11.25.0 in package.json
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis to 1.7.0 and syn to 3.0.5; update packageManager to pnpm@12.3.4 in package.json
+- Update dependencies in Cargo.lock to latest versions (bitflags 2.13.2, cc 1.4.6, rustls 0.23.45, smallvec 1.16.1) and update packageManager to pnpm@12.4.1 in package.json
+- Update dependencies to version 2.5.13 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.2
+- Update pnpm action version to 6.1.0 and docker/setup-qemu-action version to 4.3.0 in CI and release workflows
+
+## [1.2.0] - 2026-08-10
+
+### Bug Fixes
+
+- Connection manager stale missing tokio signal for discard and reconnect
+
+## [1.1.3] - 2026-08-10
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.6 and 1.1.0, and bump packageManager to pnpm@11.18.0
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis 1.5.0 and displaydoc 0.2.7
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions, including ioredis 6.0.0 and regex-automata 0.4.18
+- Update dependencies to version 2.5.7 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.0
+- Update pnpm and Docker login action versions in CI and release workflows, and reorder imports in Rust source files
+
 ## [1.1.2] - 2026-07-27
 
 ### Miscellaneous Tasks

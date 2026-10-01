@@ -3,10 +3,9 @@ mod hash;
 mod targets;
 mod token;
 
+use anyhow::bail;
 use std::fmt;
 use std::time::Duration;
-
-use anyhow::bail;
 
 use crate::client::TrustedProxies;
 use crate::commands::{ALLOWED_COMMANDS, DENIED_COMMANDS, RATELIMIT_COMMANDS, REALTIME_COMMANDS};

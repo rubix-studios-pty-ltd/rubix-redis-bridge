@@ -1,22 +1,22 @@
 [package]
 name = "rubix-redis-bridge"
-version = "1.1.2"
+version = "1.2.3"
 authors = ["rubixvi"]
 license = "MIT"
 repository = "https://github.com/rubix-studios-pty-ltd/rubix-redis-bridge"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.98.1"
 publish = false
 
 [dependencies]
 anyhow = "1"
 axum = { version = "0.8", features = ["json", "tokio"] }
-base64 = "0.23"
+base64 = "0.23.1"
 futures-util = "0.3"
 hex = "0.4"
 hmac = "0.13"
 prometheus = "0.14"
-redis = { version = "1.5.0", features = ["aio", "tokio-comp", "connection-manager", "tokio-rustls-comp", "num-bigint"] }
+redis = { version = "1.7.1", features = ["aio", "tokio-comp", "connection-manager", "tokio-rustls-comp", "num-bigint"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
@@ -28,7 +28,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
-num-bigint = "0.4"
+num-bigint = "0.5"
 
 [profile.release]
 codegen-units = 1

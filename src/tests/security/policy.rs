@@ -1,6 +1,5 @@
-use std::collections::HashSet;
-
 use serde_json::{Value, json};
+use std::collections::HashSet;
 
 use crate::commands::{CONNECTION_COMMANDS, DENIED_COMMANDS};
 use crate::config::TokenCaps;

@@ -1,12 +1,11 @@
-use std::net::SocketAddr;
-use std::sync::Arc;
-
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, Json, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use tracing::error;
 
 use crate::metrics::Metrics;

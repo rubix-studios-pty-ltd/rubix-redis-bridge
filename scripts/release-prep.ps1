@@ -29,7 +29,11 @@ try {
     cargo check --workspace --all-targets
 
     if (Test-Path "package.json") {
-        npm version $version --no-git-tag-version --ignore-scripts
+        npm version $version --no-git-tag-version --ignore-scripts --allow-same-version
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm version failed with exit code $LASTEXITCODE"
+        }
     }
 
     if (Test-Path "CHANGELOG.md") {

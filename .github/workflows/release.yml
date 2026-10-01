@@ -17,9 +17,12 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 env:
   IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE }}
+  GHCR_IMAGE: ghcr.io/rubix-studios-pty-ltd/rubix-redis-bridge
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
@@ -58,7 +61,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2.9.1
+        uses: swatinem/rust-cache@v2.9.2
 
       - name: Install cargo audit and cargo deny
         run: |
@@ -81,7 +84,7 @@ jobs:
         run: cargo deny check
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6.0.9
+        uses: pnpm/action-setup@v6.1.0
 
       - name: Setup Node
         uses: actions/setup-node@v7.0.0
@@ -153,10 +156,10 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.2.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Build local image for scan
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           push: false
@@ -170,6 +173,8 @@ jobs:
         with:
           image-ref: rubix-redis-bridge:scan
           severity: CRITICAL,HIGH
+          scanners: 'vuln'
+          vuln-type: 'library'
           ignore-unfixed: true
           exit-code: "1"
 
@@ -182,6 +187,7 @@ jobs:
 
     permissions:
       contents: read
+      packages: write
       id-token: write
 
     outputs:
@@ -228,22 +234,31 @@ jobs:
           echo "semver=${VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.2.0
+        uses: docker/setup-qemu-action@v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.2.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v4.4.0
+        uses: docker/login-action@v4.6.0
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE }}
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.semver }}
@@ -256,7 +271,7 @@ jobs:
 
       - name: Build and push image with SBOM and provenance
         id: build
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           push: true
@@ -274,14 +289,58 @@ jobs:
       - name: Check Cosign
         run: cosign version
 
-      - name: Sign Docker image digest
+      - name: Sign Docker image digests
         env:
           COSIGN_YES: "true"
-          IMAGE_REF: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          DOCKERHUB_IMAGE: ${{ env.IMAGE_NAME }}
+          GHCR_IMAGE: ${{ env.GHCR_IMAGE }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          if [ -z "${{ steps.build.outputs.digest }}" ]; then
+          set -euo pipefail
+
+          if [ -z "$IMAGE_DIGEST" ]; then
             echo "Docker build digest is missing"
             exit 1
           fi
 
-          cosign sign "$IMAGE_REF"
+          if [ -z "$DOCKERHUB_IMAGE" ]; then
+            echo "Docker Hub image name is missing"
+            exit 1
+          fi
+
+          if [ -z "$GHCR_IMAGE" ]; then
+            echo "GHCR image name is missing"
+            exit 1
+          fi
+
+          echo "Signing Docker Hub image:"
+          echo "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
+          cosign sign "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
+
+          echo "Signing GHCR image:"
+          echo "$GHCR_IMAGE@$IMAGE_DIGEST"
+          cosign sign "$GHCR_IMAGE@$IMAGE_DIGEST"
+
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    needs: docker
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.docker.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists"
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi

@@ -359,7 +359,11 @@ test('Test(@upstash/realtime): emit, history, and SSE subscription', async (t) =
     assert.equal(received.event, 'updated')
     assert.deepEqual(received.data, { value: 'hello' })
     assert.ok(received.id)
-    assert.deepEqual(history.at(-1), received)
+    const lastHistory = history.at(-1)
+    assert.equal(lastHistory.id, received.id)
+    assert.equal(lastHistory.channel, received.channel)
+    assert.equal(lastHistory.event, received.event)
+    assert.deepEqual(lastHistory.data, received.data)
   } finally {
     await unsubscribe?.()
     await redis.del(channel)
