@@ -1,3 +1,4 @@
+
 name: Docker Release
 
 on:
@@ -16,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -26,8 +27,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  validate:
-    name: Validate release
+  release:
+    name: Validate, build and publish
     runs-on: ubuntu-24.04
 
     services:
@@ -52,8 +53,27 @@ jobs:
       RRB_TEST_URL: http://127.0.0.1:8080
 
     steps:
+      - name: Set release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${INPUT_VERSION:-$REF_NAME}"
+
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version tag: $VERSION"
+            echo "Expected format like v0.1.0"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "semver=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ steps.version.outputs.version }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -87,13 +107,13 @@ jobs:
         uses: pnpm/action-setup@v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build release binary
@@ -126,15 +146,11 @@ jobs:
           cat rrb.log
           exit 1
 
+      - name: Check readiness
+        run: curl -fsS "$RRB_TEST_URL/readyz"
+
       - name: Run compatibility tests
         run: pnpm test:sdk
-
-      - name: Stop bridge
-        if: always()
-        run: |
-          if [ -f rrb.pid ]; then
-            kill "$(cat rrb.pid)" || true
-          fi
 
       - name: Print bridge logs on failure
         if: failure()
@@ -143,17 +159,12 @@ jobs:
             cat rrb.log
           fi
 
-  docker-scan:
-    name: Build and scan image
-    runs-on: ubuntu-24.04
-    needs: validate
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Stop bridge
+        if: always()
+        run: |
+          if [ -f rrb.pid ]; then
+            kill "$(cat rrb.pid)" || true
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
@@ -173,71 +184,27 @@ jobs:
         with:
           image-ref: rubix-redis-bridge:scan
           severity: CRITICAL,HIGH
-          scanners: 'vuln'
-          vuln-type: 'library'
+          scanners: vuln
+          vuln-type: library
           ignore-unfixed: true
           exit-code: "1"
 
-  docker:
-    name: Publish Docker image
-    runs-on: ubuntu-24.04
-    needs:
-      - validate
-      - docker-scan
-
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-
-    outputs:
-      image: ${{ env.IMAGE_NAME }}
-      digest: ${{ steps.build.outputs.digest }}
-      version: ${{ steps.version.outputs.version }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
       - name: Validate Docker Hub variables
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
         run: |
-          if [ -z "${IMAGE_NAME}" ]; then
+          if [ -z "$IMAGE_NAME" ]; then
             echo "Repository variable DOCKERHUB_IMAGE is required."
-            echo "Example: rubixstudios/rubix-redis-bridge"
             exit 1
           fi
 
-          if [ -z "${{ vars.DOCKERHUB_USERNAME }}" ]; then
+          if [ -z "$DOCKERHUB_USERNAME" ]; then
             echo "Repository variable DOCKERHUB_USERNAME is required."
             exit 1
           fi
 
-      - name: Set release version
-        id: version
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            VERSION="${GITHUB_REF_NAME}"
-          fi
-
-          VERSION="${VERSION#refs/tags/}"
-
-          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+){1,2}([-+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid version tag: $VERSION"
-            echo "Expected format like v0.1.0"
-            exit 1
-          fi
-
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "semver=${VERSION#v}" >> "$GITHUB_OUTPUT"
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.4.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4.6.0
@@ -262,7 +229,7 @@ jobs:
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.semver }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !contains(steps.version.outputs.version, '-') }}
           labels: |
             org.opencontainers.image.title=Rubix Redis Bridge
             org.opencontainers.image.description=Secure Rust HTTP bridge for Redis with Upstash-style API compatibility
@@ -286,9 +253,6 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.1.2
 
-      - name: Check Cosign
-        run: cosign version
-
       - name: Sign Docker image digests
         env:
           COSIGN_YES: "true"
@@ -303,38 +267,14 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$DOCKERHUB_IMAGE" ]; then
-            echo "Docker Hub image name is missing"
-            exit 1
-          fi
-
-          if [ -z "$GHCR_IMAGE" ]; then
-            echo "GHCR image name is missing"
-            exit 1
-          fi
-
-          echo "Signing Docker Hub image:"
-          echo "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
           cosign sign "$DOCKERHUB_IMAGE@$IMAGE_DIGEST"
-
-          echo "Signing GHCR image:"
-          echo "$GHCR_IMAGE@$IMAGE_DIGEST"
           cosign sign "$GHCR_IMAGE@$IMAGE_DIGEST"
 
-  github-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-24.04
-    needs: docker
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Create release if missing
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.docker.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists"
