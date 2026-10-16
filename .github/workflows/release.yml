@@ -71,7 +71,7 @@ jobs:
           echo "semver=${VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: refs/tags/${{ steps.version.outputs.version }}
 
@@ -221,7 +221,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v6.2.0
         with:
           images: |
             ${{ env.IMAGE_NAME }}
