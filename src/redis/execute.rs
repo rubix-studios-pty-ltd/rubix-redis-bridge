@@ -2,7 +2,6 @@ use redis::Value;
 use redis::aio::ConnectionManager;
 use std::future::Future;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{error, warn};
@@ -126,13 +125,8 @@ where
 
     let operation_metrics = metrics.begin_operation(target_id.clone(), operation_name);
 
-    let used_shard = Arc::new(AtomicUsize::new(usize::MAX));
-    let used_generation = Arc::new(AtomicU64::new(0));
-
     let result = {
         let target = target.clone();
-        let used_shard = used_shard.clone();
-        let used_generation = used_generation.clone();
 
         timeout(request_timeout, async move {
             let _permit = timeout(acquire_timeout, target.acquire_operation())
@@ -156,7 +150,7 @@ where
                     ApiError::unavailable("Redis backend unavailable")
                 })?;
 
-            let (shard, generation, connection) = target.connection().await.map_err(|error| {
+            let (_, _, connection) = target.connection().await.map_err(|error| {
                 error!(
                     %error,
                     target = %task_id,
@@ -165,9 +159,6 @@ where
 
                 ApiError::unavailable("Redis backend unavailable")
             })?;
-
-            used_generation.store(generation, Ordering::Relaxed);
-            used_shard.store(shard, Ordering::Release);
 
             operation(connection).await
         })
@@ -193,20 +184,9 @@ where
                 timeout_message
             );
 
-            let shard = used_shard.load(Ordering::Acquire);
-
-            if shard != usize::MAX {
-                let generation = used_generation.load(Ordering::Relaxed);
-
-                if target.invalidate_connection(shard, generation).await {
-                    warn!(
-                        target = %target_id,
-                        shard,
-                        generation,
-                        "Discarded Redis connection after timeout"
-                    );
-                }
-            }
+            // Do not discard a shared multiplexed ConnectionManager here.
+            // A cancelled or slow command does not prove the socket is dead.
+            // Supervisors probe connections and handle recovery independently.
 
             Err(ApiError::timeout(timeout_message))
         }

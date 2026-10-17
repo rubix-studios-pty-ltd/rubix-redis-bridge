@@ -10,8 +10,8 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::timeout;
-use tracing::{error, warn};
+use tokio::time::{sleep, timeout};
+use tracing::{error, info, warn};
 
 use crate::security::CommandArg;
 
@@ -100,16 +100,67 @@ pub async fn subscribe(
     let (sink, messages) = pubsub.split();
     let initial =
         stream::once(async move { Ok::<Event, Infallible>(Event::default().data(subscribed)) });
-    let messages = stream::unfold(
-        (messages, sink, permit, connection_guard),
-        |(mut messages, sink, permit, connection_guard)| async move {
-            let message = messages.next().await?;
-            let message_channel = message.get_channel_name();
-            let payload = String::from_utf8_lossy(message.get_payload_bytes());
-            let data = format!("message,{message_channel},{payload}");
-            let event = Ok::<Event, Infallible>(Event::default().data(data));
+    let reconnect_timeout = state.request_timeout();
 
-            Some((event, (messages, sink, permit, connection_guard)))
+    let messages = stream::unfold(
+        (
+            Some((messages, sink)),
+            target,
+            channel,
+            target_id,
+            permit,
+            connection_guard,
+            Duration::from_millis(250),
+        ),
+        move |(mut current, target, channel, target_id, permit, connection_guard, mut backoff)| async move {
+            loop {
+                if let Some((mut messages, sink)) = current.take() {
+                    if let Some(message) = messages.next().await {
+                        let message_channel = message.get_channel_name();
+                        let payload = String::from_utf8_lossy(message.get_payload_bytes());
+                        let data = format!("message,{message_channel},{payload}");
+                        let event = Ok::<Event, Infallible>(Event::default().data(data));
+
+                        return Some((
+                            event,
+                            (
+                                Some((messages, sink)),
+                                target,
+                                channel,
+                                target_id,
+                                permit,
+                                connection_guard,
+                                backoff,
+                            ),
+                        ));
+                    }
+
+                    warn!(
+                        target = %target_id,
+                        "Redis realtime stream disconnected; reconnecting"
+                    );
+                }
+
+                let reconnected = timeout(reconnect_timeout, async {
+                    let mut pubsub = target.pubsub().await?;
+                    pubsub.subscribe(channel.as_str()).await?;
+                    Ok::<_, anyhow::Error>(pubsub)
+                })
+                .await;
+
+                if let Ok(Ok(pubsub)) = reconnected {
+                    let (sink, messages) = pubsub.split();
+
+                    current = Some((messages, sink));
+                    backoff = Duration::from_millis(250);
+
+                    info!(target = %target_id, "Redis realtime stream reconnected");
+                    continue;
+                }
+
+                sleep(backoff).await;
+                backoff = backoff.saturating_mul(2).min(Duration::from_secs(5));
+            }
         },
     );
     let stream = initial.chain(messages);

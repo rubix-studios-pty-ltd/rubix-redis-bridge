@@ -17,6 +17,8 @@ pub(super) struct Collectors {
     pub(super) realtime_total: IntCounterVec,
     pub(super) realtime_inflight: IntGaugeVec,
     pub(super) configured_targets: IntGauge,
+    pub(super) redis_connected_shards: IntGaugeVec,
+    pub(super) redis_connection_attempts: IntCounterVec,
 }
 
 impl Collectors {
@@ -112,6 +114,22 @@ impl Collectors {
             "Number of configured Redis bridge targets.",
         ))?;
 
+        let redis_connected_shards = IntGaugeVec::new(
+            Opts::new(
+                "rrb_redis_connected_shards",
+                "Current established Redis connection shards by target.",
+            ),
+            &["target"],
+        )?;
+
+        let redis_connection_attempts = IntCounterVec::new(
+            Opts::new(
+                "rrb_redis_connection_attempts_total",
+                "Redis connection creation attempts, separated by outcome.",
+            ),
+            &["target", "outcome"],
+        )?;
+
         Ok(Self {
             auth_failed_total,
             auth_lockouts_total,
@@ -127,6 +145,8 @@ impl Collectors {
             realtime_total,
             realtime_inflight,
             configured_targets,
+            redis_connected_shards,
+            redis_connection_attempts,
         })
     }
 
@@ -145,6 +165,8 @@ impl Collectors {
         registry.register(Box::new(self.realtime_total.clone()))?;
         registry.register(Box::new(self.realtime_inflight.clone()))?;
         registry.register(Box::new(self.configured_targets.clone()))?;
+        registry.register(Box::new(self.redis_connected_shards.clone()))?;
+        registry.register(Box::new(self.redis_connection_attempts.clone()))?;
 
         Ok(())
     }
