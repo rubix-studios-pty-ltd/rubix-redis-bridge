@@ -35,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
     let max_concurrency = config.max_concurrency;
     let max_realtime_concurrency = config.max_realtime_concurrency;
     let state = Arc::new(AppState::new(config)?);
+    state.start_connection_workers();
 
     info!(
         bind = %bind,

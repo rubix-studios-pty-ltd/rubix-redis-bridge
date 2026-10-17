@@ -7,7 +7,9 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore, SemaphorePermit, TryAcquireError};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, SemaphorePermit, TryAcquireError, watch};
+use tokio::time::{sleep, timeout};
+use tracing::{info, warn};
 
 use crate::auth::AuthLockout;
 use crate::client::TrustedProxies;
@@ -15,6 +17,7 @@ use crate::config::{Bridge, Redis, TokenCaps, TokenHash};
 use crate::metrics::Metrics;
 use crate::security::SecurityPolicy;
 
+#[derive(Clone)]
 struct ConnectionSlot {
     generation: u64,
     connection: Option<ConnectionManager>,
@@ -39,7 +42,7 @@ pub struct AppState {
 pub(crate) struct RedisTarget {
     pub(crate) config: Redis,
     client: redis::Client,
-    connections: Vec<RwLock<ConnectionSlot>>,
+    connections: Vec<watch::Sender<ConnectionSlot>>,
     next_connection: AtomicUsize,
     operation_limit: Semaphore,
 }
@@ -117,12 +120,13 @@ impl AppState {
                     format!("Invalid Redis URL for target {}", target_config.rrb_id)
                 })?;
 
-            let connections: Vec<RwLock<ConnectionSlot>> = (0..target_config.connection_shards)
+            let connections = (0..target_config.connection_shards)
                 .map(|_| {
-                    RwLock::new(ConnectionSlot {
+                    watch::channel(ConnectionSlot {
                         generation: 0,
                         connection: None,
                     })
+                    .0
                 })
                 .collect();
 
@@ -178,6 +182,25 @@ impl AppState {
         })
     }
 
+    pub(crate) fn start_connection_workers(&self) {
+        for target in &self.targets {
+            for shard in 0..target.connections.len() {
+                let target = Arc::clone(target);
+                tokio::spawn(async move {
+                    target.maintain_connection(shard).await;
+                });
+            }
+        }
+    }
+
+    pub(crate) fn targets_ready(&self) -> bool {
+        !self.targets.is_empty()
+            && self
+                .targets
+                .iter()
+                .all(|target| target.connections_initialized() > 0)
+    }
+
     pub(crate) fn request_timeout(&self) -> Duration {
         self.request_timeout
     }
@@ -192,10 +215,6 @@ impl AppState {
 
     pub(crate) fn target_count(&self) -> usize {
         self.targets.len()
-    }
-
-    pub(crate) fn has_targets(&self) -> bool {
-        !self.targets.is_empty()
     }
 
     pub(crate) fn metrics(&self) -> &Metrics {
@@ -262,63 +281,113 @@ impl RedisTarget {
 
     pub(crate) async fn connection(&self) -> anyhow::Result<(usize, u64, ConnectionManager)> {
         let shard = self.next_connection.fetch_add(1, Ordering::Relaxed) % self.connections.len();
+        let mut receiver = self.connections[shard].subscribe();
 
-        {
-            let slot = self.connections[shard].read().await;
+        loop {
+            let slot = receiver.borrow_and_update().clone();
 
-            if let Some(connection) = slot.connection.as_ref() {
-                return Ok((shard, slot.generation, connection.clone()));
+            if let Some(connection) = slot.connection {
+                return Ok((shard, slot.generation, connection));
             }
+
+            receiver.changed().await.context("Redis connection supervisor stopped")?;
         }
-
-        let mut slot = self.connections[shard].write().await;
-
-        if let Some(connection) = slot.connection.as_ref() {
-            return Ok((shard, slot.generation, connection.clone()));
-        }
-
-        let config = ConnectionManagerConfig::new()
-            .set_connection_timeout(Some(Duration::from_secs(1)))
-            .set_number_of_retries(2)
-            .set_min_delay(Duration::from_millis(100))
-            .set_max_delay(Duration::from_millis(250));
-
-        let connection = self
-            .client
-            .get_connection_manager_with_config(config)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to connect to Redis target {} connection shard {}",
-                    self.config.rrb_id, shard
-                )
-            })?;
-
-        slot.generation = slot.generation.wrapping_add(1);
-
-        if slot.generation == 0 {
-            slot.generation = 1;
-        }
-
-        let generation = slot.generation;
-        slot.connection = Some(connection.clone());
-
-        Ok((shard, generation, connection))
     }
 
     pub(crate) async fn invalidate_connection(&self, shard: usize, generation: u64) -> bool {
-        let Some(connection_slot) = self.connections.get(shard) else {
+        let Some(sender) = self.connections.get(shard) else {
             return false;
         };
 
-        let mut slot = connection_slot.write().await;
+        let mut invalidated = false;
+        sender.send_if_modified(|slot| {
+            if slot.generation != generation || slot.connection.is_none() {
+                return false;
+            }
 
-        if slot.generation != generation || slot.connection.is_none() {
-            return false;
+            slot.connection = None;
+            invalidated = true;
+            true
+        });
+
+        invalidated
+    }
+
+    async fn maintain_connection(self: Arc<Self>, shard: usize) {
+        const PROBE_INTERVAL: Duration = Duration::from_secs(15);
+        const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+        const MAX_BACKOFF: Duration = Duration::from_secs(5);
+
+        let mut receiver = self.connections[shard].subscribe();
+        let mut backoff = Duration::from_millis(250);
+        let mut failures = 0_u64;
+
+        loop {
+            let slot = receiver.borrow_and_update().clone();
+
+            if let Some(mut connection) = slot.connection {
+                tokio::select! {
+                    changed = receiver.changed() => {
+                        if changed.is_err() {
+                            return;
+                        }
+                    }
+                    _ = sleep(PROBE_INTERVAL) => {
+                        let probe: Result<redis::RedisResult<String>, _> = timeout(
+                            PROBE_TIMEOUT,
+                            redis::cmd("PING").query_async(&mut connection),
+                        ).await;
+
+                        if !matches!(probe, Ok(Ok(ref response)) if response == "PONG") {
+                            if self.invalidate_connection(shard, slot.generation).await {
+                                warn!(
+                                    target = %self.id(),
+                                    shard,
+                                    "Redis connection health check failed; reconnecting"
+                                );
+                            }
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            let config = ConnectionManagerConfig::new()
+                .set_connection_timeout(Some(Duration::from_secs(1)))
+                .set_number_of_retries(2)
+                .set_min_delay(Duration::from_millis(100))
+                .set_max_delay(Duration::from_millis(250));
+
+            match self.client.get_connection_manager_with_config(config).await {
+                Ok(connection) => {
+                    self.connections[shard].send_modify(|slot| {
+                        slot.generation = slot.generation.wrapping_add(1).max(1);
+                        slot.connection = Some(connection);
+                    });
+
+                    info!(target = %self.id(), shard, "Redis connection established");
+                    backoff = Duration::from_millis(250);
+                    failures = 0;
+                }
+                Err(error) => {
+                    failures = failures.saturating_add(1);
+
+                    if failures == 1 || failures % 12 == 0 {
+                        warn!(
+                            target = %self.id(),
+                            shard,
+                            failures,
+                            %error,
+                            "Redis connection attempt failed; retrying"
+                        );
+                    }
+
+                    sleep(backoff).await;
+                    backoff = backoff.saturating_mul(2).min(MAX_BACKOFF);
+                }
+            }
         }
-
-        slot.connection = None;
-        true
     }
 
     pub(crate) async fn pubsub(&self) -> anyhow::Result<redis::aio::PubSub> {
@@ -333,11 +402,7 @@ impl RedisTarget {
     fn connections_initialized(&self) -> usize {
         self.connections
             .iter()
-            .filter(|slot| {
-                slot.try_read()
-                    .map(|guard| guard.connection.is_some())
-                    .unwrap_or(false)
-            })
+            .filter(|sender| sender.borrow().connection.is_some())
             .count()
     }
 }

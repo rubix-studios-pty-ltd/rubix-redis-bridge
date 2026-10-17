@@ -33,8 +33,8 @@ pub async fn healthz() -> impl IntoResponse {
 }
 
 pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
-    if !state.has_targets() {
-        return ApiError::unavailable("No Redis targets configured").into_response();
+    if !state.targets_ready() {
+        return ApiError::unavailable("Redis backend unavailable").into_response();
     }
 
     json_response(
