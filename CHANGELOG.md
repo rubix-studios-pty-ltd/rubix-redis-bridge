@@ -1,3 +1,30 @@
+## [1.2.4] - 2026-10-17
+
+### Features
+
+- *(realtime)* Enhance Redis connection management and metrics
+
+### Bug Fixes
+
+- *(state)* Implement connection management and readiness checks
+
+### Refactor
+
+- *(state)* Improve readability of connection management logic
+
+### Miscellaneous Tasks
+
+- Update lazy_static to version 1.5.1 in Cargo.lock
+- Update @biomejs/biome to version 2.5.15 in package.json and related files
+- Update dependencies and package versions in Cargo.lock, Cargo.toml, package.json, and pnpm-lock.yaml
+- Enhance CI and release workflows with Docker validation, update Node.js version, and improve version tagging
+- Simplify FUNDING.yml and enable cancellation of in-progress Docker releases
+- Update dependencies in Cargo.lock, Cargo.toml, package.json, and pnpm-lock.yaml to latest versions
+- Add JSON formatter override for package.json in biome.json
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions
+- *(ci)* Update actions/checkout and docker/metadata-action versions
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
 ## [1.2.3] - 2026-10-01
 
 ### Bug Fixes
