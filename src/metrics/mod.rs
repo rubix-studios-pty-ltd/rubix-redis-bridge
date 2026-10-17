@@ -28,6 +28,8 @@ pub struct Metrics {
     pub realtime_total: IntCounterVec,
     pub realtime_inflight: IntGaugeVec,
     pub configured_targets: IntGauge,
+    pub redis_connected_shards: IntGaugeVec,
+    pub redis_connection_attempts: IntCounterVec,
 }
 
 impl Metrics {
@@ -53,6 +55,8 @@ impl Metrics {
             realtime_total: collectors.realtime_total,
             realtime_inflight: collectors.realtime_inflight,
             configured_targets: collectors.configured_targets,
+            redis_connected_shards: collectors.redis_connected_shards,
+            redis_connection_attempts: collectors.redis_connection_attempts,
         })
     }
 
