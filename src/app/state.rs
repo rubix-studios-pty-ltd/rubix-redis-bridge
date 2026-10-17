@@ -290,7 +290,10 @@ impl RedisTarget {
                 return Ok((shard, slot.generation, connection));
             }
 
-            receiver.changed().await.context("Redis connection supervisor stopped")?;
+            receiver
+                .changed()
+                .await
+                .context("Redis connection supervisor stopped")?;
         }
     }
 
@@ -338,15 +341,15 @@ impl RedisTarget {
                             redis::cmd("PING").query_async(&mut connection),
                         ).await;
 
-                        if !matches!(probe, Ok(Ok(ref response)) if response == "PONG") {
-                            if self.invalidate_connection(shard, slot.generation).await {
+                        if !matches!(probe, Ok(Ok(ref response)) if response == "PONG")
+                            && self.invalidate_connection(shard, slot.generation).await {
                                 warn!(
                                     target = %self.id(),
                                     shard,
                                     "Redis connection health check failed; reconnecting"
                                 );
                             }
-                        }
+
                     }
                 }
 
@@ -373,7 +376,7 @@ impl RedisTarget {
                 Err(error) => {
                     failures = failures.saturating_add(1);
 
-                    if failures == 1 || failures % 12 == 0 {
+                    if failures == 1 || failures.is_multiple_of(12) {
                         warn!(
                             target = %self.id(),
                             shard,
