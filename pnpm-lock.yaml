@@ -174,7 +174,7 @@ importers:
         version: 2.2.0(@upstash/redis@1.39.0)
       '@upstash/realtime':
         specifier: 1.1.0
-        version: 1.1.0(@upstash/redis@1.39.0)(zod@4.6.5)
+        version: 1.1.0(@upstash/redis@1.39.0)(zod@4.6.7)
       '@upstash/redis':
         specifier: latest
         version: 1.39.0
@@ -310,8 +310,8 @@ packages:
     resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
     engines: {node: '>=22.19.0'}
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -361,10 +361,10 @@ snapshots:
       '@upstash/core-analytics': 0.0.10
       '@upstash/redis': 1.39.0
 
-  '@upstash/realtime@1.1.0(@upstash/redis@1.39.0)(zod@4.6.5)':
+  '@upstash/realtime@1.1.0(@upstash/redis@1.39.0)(zod@4.6.7)':
     dependencies:
       '@upstash/redis': 1.39.0
-      zod: 4.6.5
+      zod: 4.6.7
 
   '@upstash/redis@1.39.0':
     dependencies:
@@ -399,4 +399,4 @@ snapshots:
 
   undici@8.12.2: {}
 
-  zod@4.6.5: {}
+  zod@4.6.7: {}
