@@ -8,17 +8,16 @@ Deployment hardening, command allowlist design, reverse proxy configuration, Red
 
 Security support applies to the current `0.3.x` release line.
 
-| Version | Supported |
-| --- | --- |
-| `0.3.x` | Yes |
-| `< 0.3.0` | No |
+| Version   | Supported |
+| --------- | --------- |
+| `0.3.x`   | Yes       |
+| `< 0.3.0` | No        |
 
 Use the latest patch release in the supported release line for production deployments.
 
 ## Reporting a Vulnerability
 
 We take the security of Rubix Redis Bridge seriously. If you believe you have found a security vulnerability, please report it to us following these steps:
-
 1. **DO NOT** create a public GitHub issue for the vulnerability.
 2. Contact us directly at one of the following:
    - X: [@rubixstory](https://x.com/rubixstory)
@@ -26,7 +25,6 @@ We take the security of Rubix Redis Bridge seriously. If you believe you have fo
    - Facebook: [rubixstudios](https://www.facebook.com/rubixstudios)
 
 Please include the following details in your report:
-
 - Affected version, Docker tag, or commit SHA
 - Deployment mode, such as `env` or `file`
 - Relevant configuration values with secrets redacted
@@ -43,7 +41,6 @@ Do not include live bearer tokens, Redis passwords, production connection string
 Rubix Redis Bridge is a server-side Redis-over-HTTP bridge. It authenticates HTTP requests and applies command policy before Redis command execution.
 
 The following issue classes are considered in scope for this security policy.
-
 - Authentication bypass
 - Bearer token handling flaws
 - Metrics authentication bypass
@@ -57,7 +54,6 @@ The following issue classes are considered in scope for this security policy.
 - Denial-of-service issues caused by missing or ineffective application-level limits
 
 The following areas are generally out of scope unless they expose a separate vulnerability in Rubix Redis Bridge.
-
 - Redis server misconfiguration
 - Exposing the bridge publicly without network, proxy, or access controls
 - Issues requiring possession of a valid bearer token without a policy bypass
@@ -91,7 +87,6 @@ A secure deployment still requires appropriate controls outside the bridge proce
 ## Security Monitoring
 
 We continuously monitor our codebase for security issues through:
-
 - Automated dependency scanning
 - Regular code reviews
 - Third-party security audits

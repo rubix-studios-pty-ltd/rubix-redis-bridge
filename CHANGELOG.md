@@ -2,15 +2,15 @@
 
 ### Features
 
-- *(realtime)* Enhance Redis connection management and metrics
+- _(realtime)_ Enhance Redis connection management and metrics
 
 ### Bug Fixes
 
-- *(state)* Implement connection management and readiness checks
+- _(state)_ Implement connection management and readiness checks
 
 ### Refactor
 
-- *(state)* Improve readability of connection management logic
+- _(state)_ Improve readability of connection management logic
 
 ### Miscellaneous Tasks
 
@@ -22,7 +22,7 @@
 - Update dependencies in Cargo.lock, Cargo.toml, package.json, and pnpm-lock.yaml to latest versions
 - Add JSON formatter override for package.json in biome.json
 - Update dependencies in Cargo.lock and Cargo.toml to latest versions
-- *(ci)* Update actions/checkout and docker/metadata-action versions
+- _(ci)_ Update actions/checkout and docker/metadata-action versions
 - Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
 
 ## [1.2.3] - 2026-10-01

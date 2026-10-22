@@ -39,7 +39,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz >/dev/null"]
+      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz >/dev/null" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -47,13 +47,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_TOKEN}"]
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_TOKEN}" ]
     environment:
       REDIS_TOKEN: ${REDIS_TOKEN}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_TOKEN}\" ping | grep PONG"]
+      test: [ "CMD-SHELL", 'redis-cli -a "$${REDIS_TOKEN}" ping | grep PONG' ]
       interval: 10s
       timeout: 3s
       retries: 10
