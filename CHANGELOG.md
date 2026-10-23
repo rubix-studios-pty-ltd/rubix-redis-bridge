@@ -1,3 +1,10 @@
+## [1.3.0] - 2026-10-23
+
+### Bug Fixes
+
+- *(sec)* Node - CVE-2026-111497
+- *(biome)* Changelog build interruption.
+
 ## [1.2.4] - 2026-10-17
 
 ### Features
