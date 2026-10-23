@@ -3,7 +3,15 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!target", "!**/*.svg", "!**/*.png", "!**/*.ico"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!target",
+      "!**/*.svg",
+      "!**/*.png",
+      "!**/*.ico",
+      "!CHANGELOG.md"
+    ]
   },
   "formatter": {
     "enabled": true,
