@@ -171,13 +171,13 @@ importers:
         version: 2.6.2
       '@upstash/ratelimit':
         specifier: latest
-        version: 2.2.0(@upstash/redis@1.39.0)
+        version: 2.2.0(@upstash/redis@1.40.0)
       '@upstash/realtime':
         specifier: 1.1.0
-        version: 1.1.0(@upstash/redis@1.39.0)(zod@4.6.7)
+        version: 1.1.0(@upstash/redis@1.40.0)(zod@4.6.7)
       '@upstash/redis':
         specifier: latest
-        version: 1.39.0
+        version: 1.40.0
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
@@ -281,8 +281,8 @@ packages:
       react-dom:
         optional: true
 
-  '@upstash/redis@1.39.0':
-    resolution: {integrity: sha512-VwkpYTdxSfjSulQS5h16NHtg/1UEheBfvez2AeGKinAujOoGXhXCcohQRzsQ/d2g/XzbjzTVGhG8Ds8uOI0Mxg==}
+  '@upstash/redis@1.40.0':
+    resolution: {integrity: sha512-F6+V7Kof2McJtGWclusZLt7hBRmIMZg+albS32/5TuNRg/92FM2nkyKPY9wWEieMj9hjyUi4iURsN1djsHNbwA==}
 
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
@@ -374,19 +374,19 @@ snapshots:
 
   '@upstash/core-analytics@0.0.10':
     dependencies:
-      '@upstash/redis': 1.39.0
+      '@upstash/redis': 1.40.0
 
-  '@upstash/ratelimit@2.2.0(@upstash/redis@1.39.0)':
+  '@upstash/ratelimit@2.2.0(@upstash/redis@1.40.0)':
     dependencies:
       '@upstash/core-analytics': 0.0.10
-      '@upstash/redis': 1.39.0
+      '@upstash/redis': 1.40.0
 
-  '@upstash/realtime@1.1.0(@upstash/redis@1.39.0)(zod@4.6.7)':
+  '@upstash/realtime@1.1.0(@upstash/redis@1.40.0)(zod@4.6.7)':
     dependencies:
-      '@upstash/redis': 1.39.0
+      '@upstash/redis': 1.40.0
       zod: 4.6.7
 
-  '@upstash/redis@1.39.0':
+  '@upstash/redis@1.40.0':
     dependencies:
       uncrypto: 0.1.3
 
