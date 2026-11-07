@@ -149,6 +149,7 @@ Recommended controls include secret management, protected environment variables,
 ## Data flow
 
 The API request flow is as follows.
+
 1. A client sends an HTTP request to the bridge endpoint with `Authorization: Bearer <token>`.
 2. The bridge parses the bearer token and compares it against configured tokens.
 3. A matching token resolves to a Redis target.
@@ -165,6 +166,7 @@ The API request flow is as follows.
 14. Metrics are updated for operation count, duration, in-flight operations, errors, timeouts, and denied commands.
 
 The realtime subscription flow is separate.
+
 1. The Upstash Redis SDK sends `POST /subscribe/<channel>` with a bearer token.
 2. The bridge requires the token to include the `realtime` capability.
 3. The channel is validated for size and SSE framing compatibility.
@@ -175,6 +177,7 @@ The realtime subscription flow is separate.
 8. Keepalive comments prevent idle intermediaries from silently buffering or expiring the stream.
 
 The metrics request flow is separate.
+
 1. A client sends `GET /metrics` with `Authorization: Bearer <metrics-token>`.
 2. The bridge validates the metrics token separately from Redis API tokens.
 3. Metrics are rendered in Prometheus text format.

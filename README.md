@@ -11,6 +11,7 @@ Applications can use supported `@upstash/redis`, `@upstash/ratelimit`, and `@ups
 ## Features
 
 Rubix Redis Bridge provides the core components required to expose Redis safely over HTTP for platforms, workloads, and applications that require API and SDK-compatible Redis access.
+
 - Redis over HTTP
 - `@upstash/redis` SDK support
 - `@upstash/ratelimit` SDK support
@@ -30,6 +31,7 @@ Rubix Redis Bridge provides the core components required to expose Redis safely 
 ## Security
 
 Security controls are applied before requests reach Redis, reducing the risk of unsafe commands, oversized payloads, unauthorised access, or uncontrolled backend usage.
+
 - Token authentication
 - Command allowlists
 - Additive blocklists
@@ -488,6 +490,7 @@ pnpm test:sdk
 Rubix Redis Bridge should be deployed as a private infrastructure service with tight network access, restricted command policy, explicit authentication, and operational monitoring.
 
 Recommended:
+
 - Random hex values for RRB_TOKEN
 - Random hex values for RRB_METRICS_TOKEN
 - Enable Redis authentication
@@ -506,6 +509,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For support or inquiries:
+
 - LinkedIn: [rubixvi](https://www.linkedin.com/in/rubixvi/)
 - Website: [Rubix Studios](https://rubixstudios.com.au)
 
