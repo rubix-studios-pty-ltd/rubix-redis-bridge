@@ -1,0 +1,137 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!node_modules",
+      "!target",
+      "!**/*.svg",
+      "!**/*.png",
+      "!**/*.ico",
+      "!CHANGELOG.md"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100,
+    "attributePosition": "auto",
+    "bracketSameLine": false,
+    "bracketSpacing": true,
+    "expand": "auto",
+    "useEditorconfig": true,
+    "includes": [
+      "**",
+      "!./node_modules",
+      "!./.pnp",
+      "!**/.pnp.*",
+      "!**/.pnpm-debug.log",
+      "!**/pnpm-lock.yaml",
+      "!**/.DS_Store",
+      "!**/*.pem",
+      "!**/.env",
+      "!**/.tmp",
+      "!**/.git",
+      "!**/.hg",
+      "!**/.pnp.*",
+      "!**/.svn",
+      "!**/.yarn/**",
+      "!**/build",
+      "!**/dist/**",
+      "!**/node_modules",
+      "!**/!target",
+      "!**/temp"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": {
+        "noArrayIndexKey": "off"
+      },
+      "style": {
+        "useImportType": {
+          "level": "on",
+          "options": {
+            "style": "inlineType"
+          }
+        }
+      }
+    },
+    "includes": [
+      "**",
+      "!**/.temp",
+      "!**/.*",
+      "!**/.git",
+      "!**/.hg",
+      "!**/.pnp.*",
+      "!**/.svn",
+      "!**/playwright.config.ts",
+      "!**/*.spec.ts",
+      "!**/*.test.ts",
+      "!**/tsconfig.tsbuildinfo",
+      "!**/README.md",
+      "!**/.yarn/",
+      "!**/node_modules/",
+      "!**/temp/",
+      "!**/!target",
+      "!**/*.cjs"
+    ]
+  },
+  "javascript": {
+    "formatter": {
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "es5",
+      "semicolons": "asNeeded",
+      "arrowParentheses": "always",
+      "quoteStyle": "single"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/package.json"],
+      "json": {
+        "formatter": {
+          "expand": "always"
+        }
+      }
+    }
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ":NODE:",
+              ":BUN:",
+              ["node", "node:*"],
+              ["react", "react/**"],
+              ":PACKAGE:",
+              ":BLANK_LINE:",
+              ["**", "!:STYLE:"],
+              ":BLANK_LINE:",
+              [":STYLE:"]
+            ]
+          }
+        },
+        "useSortedAttributes": {
+          "level": "on",
+          "options": {
+            "sortOrder": "natural"
+          }
+        },
+        "useSortedInterfaceMembers": "on"
+      }
+    }
+  }
+}

@@ -1,0 +1,323 @@
+## [1.3.0] - 2026-10-23
+
+### Bug Fixes
+
+- *(sec)* Node - CVE-2026-111497
+- *(biome)* Changelog build interruption.
+
+## [1.2.4] - 2026-10-17
+
+### Features
+
+- _(realtime)_ Enhance Redis connection management and metrics
+
+### Bug Fixes
+
+- _(state)_ Implement connection management and readiness checks
+
+### Refactor
+
+- _(state)_ Improve readability of connection management logic
+
+### Miscellaneous Tasks
+
+- Update lazy_static to version 1.5.1 in Cargo.lock
+- Update @biomejs/biome to version 2.5.15 in package.json and related files
+- Update dependencies and package versions in Cargo.lock, Cargo.toml, package.json, and pnpm-lock.yaml
+- Enhance CI and release workflows with Docker validation, update Node.js version, and improve version tagging
+- Simplify FUNDING.yml and enable cancellation of in-progress Docker releases
+- Update dependencies in Cargo.lock, Cargo.toml, package.json, and pnpm-lock.yaml to latest versions
+- Add JSON formatter override for package.json in biome.json
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions
+- _(ci)_ Update actions/checkout and docker/metadata-action versions
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
+## [1.2.3] - 2026-10-01
+
+### Bug Fixes
+
+- Redis connection management by adding custom configuration options for timeout and retry settings
+- Release workflow by adding GitHub release creation step and updating permissions for package and id-token access
+- Enhance npm version command in release prep script to allow same version and handle errors
+
+### Miscellaneous Tasks
+
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (cc 1.4.7, cfg-if 1.0.5, find-msvc-tools 0.1.13, syn 3.0.6, unicode-ident 1.0.26, yoke-derive 0.8.3, zerofrom-derive 0.1.8, and @biomejs/biome 2.5.14)
+- Update packageManager to pnpm@12.5.1 and bump biome schema version to 2.5.14 in biome.json, package.json, and pnpm-lock.yaml
+- Update Docker actions to latest versions in CI and release workflows, upgrading setup-buildx to v4.4.0 and build-push-action to v7.4.0
+- Upgrade setup-buildx-action to v4.4.1 in CI and release workflows
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions (cc 1.5.1, find-msvc-tools 0.1.14, hyper-util 0.1.21, redis 1.7.1, smallvec 1.16.2, thiserror 2.0.21)
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions (tokio-rustls 0.26.6, xxhash-rust 0.8.19, yoke-derive 0.8.4, undici 8.11.2, and pnpm to 12.8.1)
+- Update base64 dependency to version 0.23.1 and rust-version to 1.98.1 in Cargo.toml and Cargo.lock
+
+## [1.2.2] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Enhance Dockerfile by adding apt-get upgrade, autoremove, and clean commands to optimize image size
+
+## [1.2.1] - 2026-09-15
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.8 in biome.json, package.json, and pnpm-lock.yaml, and bump packageManager to pnpm@11.21.0
+- Update dependencies to version 2.5.9 in biome.json, package.json, and pnpm-lock.yaml, and bump redis to 1.6.0 in Cargo.toml and Cargo.lock
+- Update rust-cache action version to 2.9.2 in CI and release workflows
+- Update dependencies to version 2.5.10 in biome.json, package.json, and pnpm-lock.yaml, and bump log and rustls-webpki versions in Cargo.lock
+- Update Docker Buildx action version to 4.3.0 in CI and release workflows
+- Update dependencies in Cargo.lock and package.json to latest versions
+- Update dependencies to version 2.5.11 in biome.json, package.json, and pnpm-lock.yaml, and bump @upstash/redis to 1.38.3
+- Update dependencies in Cargo.lock to latest versions (cpufeatures 0.3.1, hyper 1.11.1, tower-http 0.7.1)
+- Update packageManager to pnpm@11.25.0 in package.json
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis to 1.7.0 and syn to 3.0.5; update packageManager to pnpm@12.3.4 in package.json
+- Update dependencies in Cargo.lock to latest versions (bitflags 2.13.2, cc 1.4.6, rustls 0.23.45, smallvec 1.16.1) and update packageManager to pnpm@12.4.1 in package.json
+- Update dependencies to version 2.5.13 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.2
+- Update pnpm action version to 6.1.0 and docker/setup-qemu-action version to 4.3.0 in CI and release workflows
+
+## [1.2.0] - 2026-08-10
+
+### Bug Fixes
+
+- Connection manager stale missing tokio signal for discard and reconnect
+
+## [1.1.3] - 2026-08-10
+
+### Miscellaneous Tasks
+
+- Update dependencies to version 2.5.6 and 1.1.0, and bump packageManager to pnpm@11.18.0
+- Update dependencies in Cargo.lock and Cargo.toml to latest versions, including redis 1.5.0 and displaydoc 0.2.7
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions, including ioredis 6.0.0 and regex-automata 0.4.18
+- Update dependencies to version 2.5.7 in biome.json, package.json, and pnpm-lock.yaml, and bump undici to 8.10.0
+- Update pnpm and Docker login action versions in CI and release workflows, and reorder imports in Rust source files
+
+## [1.1.2] - 2026-07-27
+
+### Miscellaneous Tasks
+
+- Remove GitHub Package workflow configuration
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
+## [1.1.1] - 2026-07-21
+
+### Bug Fixes
+
+- Update test configuration for RRB_TEST_URL and RRB_TOKEN
+- Update docker-compose ports for local and Tailscale configurations
+- Update port configuration in README and CI workflow to use 8080
+
+### Miscellaneous Tasks
+
+- Update dependencies to latest versions and bump schema version in biome.json
+- Update packageManager version to pnpm@11.14.0
+- Update redis, tokio, and tokio-macros dependencies to latest versions
+- Update dependencies in Cargo.lock, package.json, and pnpm-lock.yaml to latest versions
+
+## [1.1.0] - 2026-07-15
+
+### Features
+
+- Enhance token management and command authorization
+- Realtime compatability with upstash realtime sdk
+- Integrate Redis client into RedisTarget for improved connection management
+
+### Bug Fixes
+
+- Ambiguous response size metrics
+- Bug ratelimit commands bypass fail close
+
+### Refactor
+
+- Rename AuthFailureResult to AuthFailure and update related logic
+- Reorganize authentication module and remove unused tests
+- Update module paths for headers, parse, and trusted components
+- Enhance lockout functionality with new methods and improved assertions
+- Reorganize security module and remove obsolete tests
+- Remove obsolete hash and targets tests
+- Remove obsolete test files for headers, parse, and trusted modules
+- Remove obsolete authentication and lockout test files
+- Reorganize Redis module and remove obsolete components
+- Update module imports in auth test structure
+- Update module exports for testing in various components
+- Move is_locked_at method for better test organization
+- Remove obsolete database test script
+- Streamline module exports for testing across multiple components
+- Remove obsolete authentication and security test files
+- Update test messages for clarity and consistency
+- Rename token_type module to token and update exports
+- Clean up whitespace in Upstash SDK tests
+- Rename TokenTypes to TokenCaps for improved clarity
+
+### Documentation
+
+- Update README to clarify Rubix Redis Bridge functionality
+- Update README to reflect changes in token types and command authorization
+
+### Miscellaneous Tasks
+
+- Update npm version command to ignore scripts during release preparation
+- Update dependencies and configuration settings
+- Update dependencies in Cargo.lock
+- Update GitHub Actions workflows to use latest action versions
+- Update dependencies in Cargo.lock and package.json
+- Update Node.js action version in build workflow to v7.0.0
+
+## [1.0.1] - 2026-07-06
+
+### Bug Fixes
+
+- Connection shards
+- Update environment variable references in README and code
+
+### Refactor
+
+- Simplify operation_limit assignment in load_env_target function
+
+### Documentation
+
+- Update README to reflect environment variable name change
+- Update README table formatting for backend compatibility section
+
+### Miscellaneous Tasks
+
+- Update crossbeam-utils to version 0.8.22 and format code for clarity
+- Update .dockerignore, .gitignore, and environment configurations
+
+## [1.0.0] - 2026-07-06
+
+### Bug Fixes
+
+- Dry run test release script
+
+### Refactor
+
+- Enhance release preparation script with dry run support and file restoration
+- Rename RedisTarget to Redis and update related configurations
+
+### Documentation
+
+- Update backend compatibility details in README
+- Correct wording in README for clarity on security recommendations
+- Improve clarity and detail in README content
+- Refine README for improved clarity and conciseness
+- Clarify deployment guidelines in THREAT_MODEL.md
+
+### Miscellaneous Tasks
+
+- Update changelog formatting and ensure proper line breaks
+- Update changelog formatting and commit parser groups for consistency
+- Add newline to changelog body for improved formatting
+- Update package name and configuration in package.json
+- Update configuration and enhance token management
+
+## [0.3.3] - 2026-07-05
+
+### Refactor
+
+- Restructure Redis response handling and serialization
+- Unify Redis value handling across modules
+
+### Miscellaneous Tasks
+
+- Update package manager and reorder devDependencies
+- Update dependencies and improve Redis response handling
+
+## [0.3.2] - 2026-07-05
+
+### Features
+
+- Prometheus /metrics
+- Add metrics token support and enhance metrics authentication
+- Startup log information
+- Define allowed, denied, and connection commands for command handling
+- Implement authentication lockout mechanism
+- Enhance authentication lockout and proxy handling
+- Enhanced lockout and proxy forward trust
+- Additonal lockout metrics and rejection for prometheus
+- Add new authentication lockout metrics to collectors
+- Enhance Redis command execution with response size limits and acquire timeout
+- Implement response size limits and error handling for Redis operations
+- Enhance Redis command execution with response size limits
+
+### Bug Fixes
+
+- Cosign image digest for docker
+- Security tests
+- Clean up whitespace in security tests
+- Compatability with upstash rate limiter
+- Lint and format
+- Update allowed commands for Upstash compatibility and refactor related configurations
+- Add missing newline at end of upstash test file
+- Rust complaint for production unused constants.
+- Type and import array
+- Regression on blocked commands initialization
+- Trusted proxy false should not error when trusted proxies are set.
+- Function name for set lockout state
+- Correct social media handles in SECURITY.md for accuracy
+
+### Other
+
+- Reorganise config.rs to modular managable files
+- Organise env checks
+
+### Refactor
+
+- Update job names in workflows for clarity
+- Update default allowed and blocked commands in configuration
+- Rename functions and test cases for clarity in redis_value and security modules
+- Remove AppState and RedisTarget implementations; rename encoding functions in metrics and redis_value modules
+- Rename token file permission function and update test names for clarity; remove unused security module
+- Remove commented TODO for command constant relocation
+- Resolve cargo clippy complaint 'unnecessary use of copied'
+- Rename encoding functions for clarity and improve handling of unsupported RedisValue variants
+- Remove redis_value module and update imports accordingly
+- Reorganize security module and update command imports
+- Move denied_commands function to a new location for improved clarity and organization
+- Migrate TrustedProxies to client module
+- Simplify authentication failure handling
+- Enhance lockout test assertions for clarity
+- Update test names for upstash ratelimit consistency
+
+### Documentation
+
+- Add RRB_METRICS_TOKEN to README for metrics authentication
+- ZINCRBY is required by upstash redis.
+- Update README.md with additional badges for CI, CodeQL, Dependabot, Socket, and License
+- Update CI badge link in README.md
+- Remove Socket badge from README.md
+- Add additional badges for Tests and Release in README.md
+- Consolidate badge display in README.md for improved readability
+- Remove CodeQL workflow file and update badge display in README.md
+- Updated docker image url
+- Improve documentations
+
+### Styling
+
+- Format imports in lockout tests for consistency
+
+### Testing
+
+- Enhance Upstash Redis tests with additional command coverage and error handling
+
+### Miscellaneous Tasks
+
+- Release pipeline hardening
+- Workflow premissions
+- Workflow permissions
+- Remove dependabot configuration file
+- Update CodeQL action versions in workflow configuration
+- Upgrade actions/checkout and Docker action versions in workflow files
+- Upgrade pnpm and Node.js action versions in workflow files
+- Update .dockerignore to include additional files and directories for better build context management
+- Update num-bigint to version 0.4.7 and remove metrics module
+- Bump version of rubix-redis-bridge to 0.2.2
+- Bump version of rubix-redis-bridge to 0.2.3
+- Update README and remove test workflow
+- Add cargo deny check to release workflow and update cosign installer version
+- Update .dockerignore to include .docs and reorder target directory for improved build context
+- Bump version of rubix-redis-bridge to 0.3.0
+- Clean up .dockerignore by removing test entry
+- Update .dockerignore to include 'docs' and add SECURITY.md
+- Update deny.toml to include BSL-1.0 license
+- Remove unnecessary blank line in SECURITY.md for improved readability
+- Release and changelog pipelines
+- Remove incorrect commit
