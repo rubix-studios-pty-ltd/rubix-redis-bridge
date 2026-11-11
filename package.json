@@ -56,11 +56,11 @@
     "update:deps": "pnpm update --latest && pnpm install && pnpm dedupe"
   },
   "engines": {
-    "node": ">=24.22.1 <25 || >=26.12.1",
+    "node": ">=24.22.3 <25 || >=26.13.1",
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.5",
+    "@biomejs/biome": "2.6.6",
     "@upstash/ratelimit": "latest",
     "@upstash/realtime": "1.1.0",
     "@upstash/redis": "latest",
