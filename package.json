@@ -62,10 +62,10 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@upstash/ratelimit": "latest",
-    "@upstash/realtime": "1.1.1",
+    "@upstash/realtime": "1.2.0",
     "@upstash/redis": "latest",
     "ioredis": "^6.0.0",
-    "undici": "^8.12.4"
+    "undici": "^8.13.0"
   },
   "packageManager": "pnpm@12.21.0"
 }
