@@ -30,14 +30,16 @@ pub(crate) async fn execute_command(
         move |mut connection| async move {
             let mut redis_command = redis::cmd(command.name.as_str());
 
-            for arg in command.args {
+            for arg in &command.args {
                 redis_command.arg(arg.as_slice());
             }
 
             let result: redis::RedisResult<Value> =
                 redis_command.query_async(&mut connection).await;
 
-            result.map_err(redis_api_error)
+            result
+                .map(|value| command.restore_response(value))
+                .map_err(redis_api_error)
         },
     )
     .await
@@ -59,7 +61,7 @@ pub(crate) async fn execute_pipeline(
         metrics,
         move |mut connection| async move {
             let mut pipe = redis::pipe();
-            append_commands(&mut pipe, commands);
+            append_commands(&mut pipe, &commands);
 
             let result: redis::RedisResult<Vec<redis::RedisResult<Value>>> =
                 pipe.ignore_errors().query_async(&mut connection).await;
@@ -68,8 +70,9 @@ pub(crate) async fn execute_pipeline(
                 .map(|items| {
                     items
                         .into_iter()
-                        .map(|item| match item {
-                            Ok(value) => RedisResponse::Result(value),
+                        .zip(&commands)
+                        .map(|(item, command)| match item {
+                            Ok(value) => RedisResponse::Result(command.restore_response(value)),
                             Err(error) => RedisResponse::Error(redis_error_message(&error)),
                         })
                         .collect()
@@ -97,11 +100,19 @@ pub(crate) async fn execute_transaction(
         move |mut connection| async move {
             let mut pipe = redis::pipe();
             pipe.atomic();
-            append_commands(&mut pipe, commands);
+            append_commands(&mut pipe, &commands);
 
             let result: redis::RedisResult<Vec<Value>> = pipe.query_async(&mut connection).await;
 
-            result.map_err(redis_api_error)
+            result
+                .map(|values| {
+                    values
+                        .into_iter()
+                        .zip(&commands)
+                        .map(|(value, command)| command.restore_response(value))
+                        .collect()
+                })
+                .map_err(redis_api_error)
         },
     )
     .await
@@ -184,20 +195,16 @@ where
                 timeout_message
             );
 
-            // Do not discard a shared multiplexed ConnectionManager here.
-            // A cancelled or slow command does not prove the socket is dead.
-            // Supervisors probe connections and handle recovery independently.
-
             Err(ApiError::timeout(timeout_message))
         }
     }
 }
 
-fn append_commands(pipe: &mut redis::Pipeline, commands: Vec<RedisCommand>) {
+fn append_commands(pipe: &mut redis::Pipeline, commands: &[RedisCommand]) {
     for command in commands {
         pipe.cmd(command.name.as_str());
 
-        for arg in command.args {
+        for arg in &command.args {
             pipe.arg(arg.as_slice());
         }
     }

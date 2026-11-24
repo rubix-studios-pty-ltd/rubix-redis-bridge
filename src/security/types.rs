@@ -6,6 +6,25 @@ use std::fmt;
 pub struct RedisCommand {
     pub name: String,
     pub args: Vec<Vec<u8>>,
+    pub(crate) script_hash: Option<(String, String)>,
+}
+
+impl RedisCommand {
+    pub(crate) fn restore_response(&self, value: redis::Value) -> redis::Value {
+        let Some((original, actual)) = &self.script_hash else {
+            return value;
+        };
+
+        match value {
+            redis::Value::BulkString(ref bytes) if bytes.as_slice() == actual.as_bytes() => {
+                redis::Value::BulkString(original.as_bytes().to_vec())
+            }
+            redis::Value::SimpleString(ref hash) if hash == actual => {
+                redis::Value::SimpleString(original.clone())
+            }
+            _ => value,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

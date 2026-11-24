@@ -4,6 +4,7 @@ use std::fmt;
 
 use crate::config::TokenCaps;
 
+use super::compatibility::ScriptCompatibility;
 use super::deny::{is_denied_command, ratelimit_commands, realtime_commands, reject_command};
 use super::script::validate_subcommand;
 use super::types::{CommandArg, RedisCommand};
@@ -15,6 +16,7 @@ pub struct SecurityPolicy {
     pub max_pipeline_commands: usize,
     pub max_command_args: usize,
     pub max_arg_bytes: usize,
+    pub(crate) compatibility: ScriptCompatibility,
 }
 
 impl fmt::Debug for SecurityPolicy {
@@ -138,9 +140,16 @@ impl SecurityPolicy {
             .map(|value| value.to_arg_bytes(self.max_arg_bytes))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        Ok(RedisCommand {
+        let mut command = RedisCommand {
             name: command_name,
             args,
-        })
+            script_hash: None,
+        };
+
+        if allow_ratelimit {
+            self.compatibility.normalize(&mut command);
+        }
+
+        Ok(command)
     }
 }

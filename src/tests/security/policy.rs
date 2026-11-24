@@ -13,6 +13,7 @@ fn policy() -> SecurityPolicy {
         max_pipeline_commands: 10,
         max_command_args: 4,
         max_arg_bytes: 16,
+        compatibility: Default::default(),
     }
 }
 
@@ -329,4 +330,86 @@ fn reject_user_blocked_realtime_blocked_command() {
         "blocked by policy",
         &realtime_token(),
     );
+}
+
+#[test]
+fn normalize_upstash_script_and_hash() {
+    let mut policy = ratelimit_policy();
+    policy.max_arg_bytes = 256;
+
+    let token = ratelimit_token();
+    let script = "#!lua flags=allow-key-locking\nreturn 1";
+    let normalized = "#!lua\nreturn 1";
+    let original = sha1_smol::Sha1::from(script).digest().to_string();
+    let actual = sha1_smol::Sha1::from(normalized).digest().to_string();
+
+    let eval = policy
+        .parse_command(&command(json!(["EVAL", script, 0])), &token)
+        .unwrap();
+
+    assert_eq!(eval.args[0], normalized.as_bytes());
+    assert!(eval.script_hash.is_none());
+
+    let evalsha = policy
+        .clone()
+        .parse_command(&command(json!(["EVALSHA", original, 0])), &token)
+        .unwrap();
+
+    assert_eq!(evalsha.args[0], actual.as_bytes());
+
+    let load = policy
+        .parse_command(&command(json!(["SCRIPT", "load", script])), &token)
+        .unwrap();
+
+    assert_eq!(load.args[1], normalized.as_bytes());
+    assert_eq!(
+        load.restore_response(redis::Value::BulkString(actual.as_bytes().to_vec())),
+        redis::Value::BulkString(original.as_bytes().to_vec())
+    );
+
+    let exists = policy
+        .parse_command(&command(json!(["SCRIPT", "EXISTS", original])), &token)
+        .unwrap();
+    assert_eq!(exists.args[1], actual.as_bytes());
+}
+
+#[test]
+fn upstash_preserves_policy_and_other_scripts() {
+    let mut policy = ratelimit_policy();
+    policy.max_arg_bytes = 256;
+
+    let token = ratelimit_token();
+    let script = "#!lua flags=allow-key-locking\nreturn 1";
+    let eval = command(json!(["EVAL", script, 0]));
+
+    assert_eq!(
+        policy.parse_command(&eval, &token).unwrap().args[0],
+        b"#!lua\nreturn 1"
+    );
+
+    assert!(policy.parse_command(&eval, &command_token()).is_err());
+    assert!(policy.parse_command(&eval, &realtime_token()).is_err());
+
+    assert_eq!(
+        policy
+            .parse_command(&eval, &command_ratelimit_token())
+            .unwrap()
+            .args[0],
+        b"#!lua\nreturn 1"
+    );
+
+    for script in [
+        "#!lua flags=no-writes\nreturn 1",
+        "#!lua flags=allow-key-locking,no-writes\nreturn 1",
+        "return '#!lua flags=allow-key-locking'",
+    ] {
+        let eval = command(json!(["EVAL", script, 0]));
+        assert_eq!(
+            policy.parse_command(&eval, &token).unwrap().args[0],
+            script.as_bytes()
+        );
+    }
+
+    policy.blocked_commands.insert("EVAL".to_string());
+    assert!(policy.parse_command(&eval, &token).is_err());
 }
