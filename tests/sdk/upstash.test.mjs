@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Realtime } from '@upstash/realtime'
@@ -307,7 +308,8 @@ test('Test(@upstash/realtime): emit, history, and SSE subscription', async (t) =
     return
   }
 
-  const channel = `sdk/realtime/${Date.now()}`
+  const channel = `sdk-realtime-${Date.now()}`
+
   const realtime = new Realtime({
     redis,
     history: {
@@ -425,4 +427,78 @@ test('Test(@upstash/ratelimit): fallback with token_type=ratelimit', async (t) =
   assert.equal(second.success, false)
   assert.equal(second.limit, 1)
   assert.equal(second.remaining, 0)
+})
+
+test('Test(@upstash/ratelimit): sliding window on standard Redis', async (t) => {
+  if (await ratelimitDisabled(t)) {
+    return
+  }
+
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(2, '1 h'),
+    prefix: `sdk:ratelimit:${randomUUID()}:sliding`,
+    analytics: false,
+    ephemeralCache: false,
+  })
+
+  for (const remaining of [1, 0]) {
+    const result = await limiter.limit('user-1')
+    assert.equal(result.success, true)
+    assert.equal(result.remaining, remaining)
+  }
+
+  const result = await limiter.limit('user-1')
+  assert.equal(result.success, false)
+  assert.equal(result.remaining, 0)
+})
+
+test('Upstash Lua compatibility preserves script hashes', async (t) => {
+  if (await ratelimitDisabled(t)) {
+    return
+  }
+
+  const script = `#!lua flags=allow-key-locking\n-- ${randomUUID()}\nreturn 42`
+  const hash = createHash('sha1').update(script).digest('hex')
+
+  const before = await rawCommand(['EVALSHA', hash, 0])
+  assert.match(before.error, /NOSCRIPT/)
+
+  const evalResult = await rawCommand(['EVAL', script, 0])
+  assert.equal(evalResult.result, 42)
+  assert.equal((await rawCommand(['EVALSHA', hash, 0])).result, 42)
+  assert.deepEqual((await rawCommand(['SCRIPT', 'EXISTS', hash])).result, [1])
+  assert.equal((await rawCommand(['SCRIPT', 'LOAD', script])).result, hash)
+
+  for (const route of ['pipeline', 'multi-exec']) {
+    const other = `${script}\n-- ${route}`
+    const otherHash = createHash('sha1').update(other).digest('hex')
+    const response = await fetch(`${url}/${route}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['SCRIPT', 'LOAD', other],
+        ['EVALSHA', otherHash, 0],
+        ['SCRIPT', 'EXISTS', otherHash],
+      ]),
+    })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), [
+      { result: otherHash },
+      { result: 42 },
+      { result: [1] },
+    ])
+  }
+
+  if (await scriptFlushDisabled(t)) {
+    return
+  }
+
+  const flushed = await rawCommand(['EVALSHA', hash, 0])
+  assert.match(flushed.error, /NOSCRIPT/)
+  assert.equal((await rawCommand(['EVAL', script, 0])).result, 42)
+  assert.equal((await rawCommand(['EVALSHA', hash, 0])).result, 42)
 })

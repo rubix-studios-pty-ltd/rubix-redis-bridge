@@ -189,6 +189,7 @@ impl Bridge {
             max_pipeline_commands,
             max_command_args,
             max_arg_bytes,
+            compatibility: Default::default(),
         };
 
         security.validate()?;

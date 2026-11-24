@@ -1,3 +1,4 @@
+mod compatibility;
 mod deny;
 mod policy;
 mod script;

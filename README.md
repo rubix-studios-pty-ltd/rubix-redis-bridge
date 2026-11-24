@@ -192,6 +192,12 @@ Use `command,realtime` when one Redis client also needs general command access. 
 
 In file mode, set `token_type` per token. If omitted, the token defaults to `command`.
 
+### Upstash Lua compatibility
+
+The `ratelimit` token capability automatically translates the exact `#!lua flags=allow-key-locking` header used by `@upstash/ratelimit` 2.1.0 and later to `#!lua` for Redis 7+ and compatible backends. Other script flags are not modified. The bridge retains up to 1024 original-to-translated SHA-1 aliases in memory, shared by its routes, for `EVALSHA` and `SCRIPT EXISTS`, and returns the original SHA-1 from a successful translated `SCRIPT LOAD`. After restart or eviction, clients must reload a missing script through `EVAL` or `SCRIPT LOAD`; Redis still controls script cache existence. This applies in both env and file mode without additional configuration.
+
+Lua-capable tokens can execute arbitrary Lua within the backend Redis ACL, not only Upstash scripts. Use trusted applications and restrict the backend Redis user accordingly. The HTTP command allowlist does not inspect commands called inside Lua.
+
 ## Command policy
 
 Command policy defines which Redis commands can be executed through the bridge and ensures unsafe or explicitly blocked commands are rejected before Redis execution.
