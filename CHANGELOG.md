@@ -1,3 +1,10 @@
+## [1.5.0] - 2026-11-24
+
+### Bug Fixes
+
+- *(security)* Node release version
+- *(redis)* Support Upstash Lua compatibility
+
 ## [1.4.0] - 2026-11-11
 
 ### Bug Fixes
