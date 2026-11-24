@@ -192,8 +192,8 @@ importers:
         specifier: latest
         version: 2.2.1(@upstash/redis@1.41.0)
       '@upstash/realtime':
-        specifier: 1.2.0
-        version: 1.2.0(@upstash/redis@1.41.0)(zod@4.6.7)
+        specifier: 1.2.1
+        version: 1.2.1(@upstash/redis@1.41.0)(zod@4.6.7)
       '@upstash/redis':
         specifier: latest
         version: 1.41.0
@@ -287,8 +287,8 @@ packages:
     peerDependencies:
       '@upstash/redis': ^1.38.2
 
-  '@upstash/realtime@1.2.0':
-    resolution: {integrity: sha512-FXAvLApNRwZ9Z/O/BN+J/H3CQfYSRjHr0Gu+50xOTTihTCOZn0ZDep0kT8QkE2xnmDwpa+LWzETczYnplNUSwA==}
+  '@upstash/realtime@1.2.1':
+    resolution: {integrity: sha512-FXbzQY7CJAkcRHDMnR8pUjyWwL1Dxwn4bKs/EH9iLPxI0DxJ9dV3zH7Cvqu/e71r8lEn47duMH0q73fn6hmLJA==}
     peerDependencies:
       '@upstash/redis': '>=1.36.1'
       react: '>=16.8.0'
@@ -396,7 +396,7 @@ snapshots:
       '@upstash/core-analytics': 0.0.10
       '@upstash/redis': 1.41.0
 
-  '@upstash/realtime@1.2.0(@upstash/redis@1.41.0)(zod@4.6.7)':
+  '@upstash/realtime@1.2.1(@upstash/redis@1.41.0)(zod@4.6.7)':
     dependencies:
       '@upstash/redis': 1.41.0
       zod: 4.6.7
