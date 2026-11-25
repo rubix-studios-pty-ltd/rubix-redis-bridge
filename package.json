@@ -62,7 +62,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.6.9",
     "@upstash/ratelimit": "^2.2.2",
-    "@upstash/realtime": "^1.2.2",
+    "@upstash/realtime": "^1.2.1",
     "@upstash/redis": "^1.41.1",
     "ioredis": "^6.1.0",
     "undici": "^8.13.1"
