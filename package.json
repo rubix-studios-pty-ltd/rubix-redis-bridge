@@ -60,7 +60,7 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.8",
+    "@biomejs/biome": "2.6.9",
     "@upstash/ratelimit": "latest",
     "@upstash/realtime": "1.2.0",
     "@upstash/redis": "latest",
