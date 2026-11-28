@@ -189,11 +189,11 @@ importers:
         specifier: ^2.6.9
         version: 2.6.9
       '@upstash/ratelimit':
-        specifier: ^2.2.2
-        version: 2.2.2(@upstash/redis@1.41.1)
+        specifier: ^2.2.3
+        version: 2.2.3(@upstash/redis@1.41.1)
       '@upstash/realtime':
-        specifier: ^1.2.1
-        version: 1.2.1(@upstash/redis@1.41.1)(zod@4.6.7)
+        specifier: ^1.2.2
+        version: 1.2.2(@upstash/redis@1.41.1)(zod@4.6.7)
       '@upstash/redis':
         specifier: ^1.41.1
         version: 1.41.1
@@ -282,15 +282,15 @@ packages:
     resolution: {integrity: sha512-7qJHGxpQgQr9/vmeS1PktEwvNAF7TI4iJDi8Pu2CFZ9YUGHZH4fOP5TfYlZ4aVxfopnELiE4BS4FBjyK7V1/xQ==}
     engines: {node: '>=16.0.0'}
 
-  '@upstash/ratelimit@2.2.2':
-    resolution: {integrity: sha512-tjICpQrbqnPqPMor+hE3d4jOr1w2WFsMZkm5jKJzxP2elljYm505wBrif1r/orSeTCnjUJyCcObWCG+tGNb/0Q==}
+  '@upstash/ratelimit@2.2.3':
+    resolution: {integrity: sha512-cf4c8LBtJenbizSWYvWN+9vh7z+ywnZaaRH+J+p3w7i06ZUAXAeKzGQc19hgrSlQM8REtvS/CHMnsT+8lXV4VQ==}
     peerDependencies:
-      '@upstash/redis': ^1.38.2
+      '@upstash/redis': ^1.41.1
 
-  '@upstash/realtime@1.2.1':
-    resolution: {integrity: sha512-FXbzQY7CJAkcRHDMnR8pUjyWwL1Dxwn4bKs/EH9iLPxI0DxJ9dV3zH7Cvqu/e71r8lEn47duMH0q73fn6hmLJA==}
+  '@upstash/realtime@1.2.2':
+    resolution: {integrity: sha512-TWRVaYZvBYTk7fghtetWI2j4StixwxbOJ5VvScNuAZ44DsJRxk3TcEzUyfvQswk7ITFeEwPD3KYspTRBEjJkPQ==}
     peerDependencies:
-      '@upstash/redis': '>=1.36.1'
+      '@upstash/redis': '>=1.41.1'
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
       zod: ^3.25.0 || ^4.0.0
@@ -391,12 +391,12 @@ snapshots:
     dependencies:
       '@upstash/redis': 1.41.1
 
-  '@upstash/ratelimit@2.2.2(@upstash/redis@1.41.1)':
+  '@upstash/ratelimit@2.2.3(@upstash/redis@1.41.1)':
     dependencies:
       '@upstash/core-analytics': 0.0.10
       '@upstash/redis': 1.41.1
 
-  '@upstash/realtime@1.2.1(@upstash/redis@1.41.1)(zod@4.6.7)':
+  '@upstash/realtime@1.2.2(@upstash/redis@1.41.1)(zod@4.6.7)':
     dependencies:
       '@upstash/redis': 1.41.1
       zod: 4.6.7
