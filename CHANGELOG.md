@@ -1,3 +1,9 @@
+## [1.5.1] - 2026-11-28
+
+### Bug Fixes
+
+- *(dep)* Align upstash/realtime
+
 ## [1.5.0] - 2026-11-24
 
 ### Bug Fixes

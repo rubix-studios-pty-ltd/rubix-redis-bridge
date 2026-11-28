@@ -880,7 +880,7 @@ dependencies = [
 
 [[package]]
 name = "rubix-redis-bridge"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "axum",
